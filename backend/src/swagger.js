@@ -7,13 +7,34 @@ const openapiSpecification = {
   info: {
     title: 'QA Playground REST API',
     version: '1.0.0',
-    description: 'REST API designed for practicing manual, API, automation, and performance testing. Includes comprehensive error handling, JWT auth with refresh tokens, role-based access control, cart, products, and order management.',
+    description: `REST API designed for practicing manual, API, automation, and performance testing. Includes comprehensive error handling, JWT auth with refresh tokens, role-based access control, cart, products, and order management.
+
+### 🔐 Quick Start & Authentication Guide
+
+To test protected API endpoints, you need a JWT Bearer Token.
+
+#### 1. Default Credentials for Testing
+| Role | Email | Password |
+|---|---|---|
+| **Admin** | \`admin@test.com\` | \`Admin@123\` |
+| **User** | \`user@test.com\` | \`User@123\` |
+
+#### 2. How to Obtain & Apply Your JWT Bearer Token
+1. **Login**: Expand **Auth** → \`POST /api/auth/login\` below.
+2. **Execute**: Click **Try it out**, enter your credentials (e.g. \`admin@test.com\` / \`Admin@123\`), and click **Execute**.
+3. **Copy Token**: Copy the \`accessToken\` string from the response JSON.
+4. **Authorize**: Click the green **Authorize 🔓** button at the top-right of this page.
+5. **Paste & Save**: Paste your token into the **Value** field and click **Authorize**. All subsequent requests will now automatically include your Bearer token!`,
     contact: {
       name: 'QA Playground Team',
       email: 'support@qaplayground.local',
     },
   },
   servers: [
+    {
+      url: '/',
+      description: 'Current Environment (Auto/Relative)',
+    },
     {
       url: 'http://localhost:3001',
       description: 'Local Development Server',
