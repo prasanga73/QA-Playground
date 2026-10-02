@@ -21,8 +21,22 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
+// Strip trailing slash from CORS_ORIGIN in case env var was set with one
+const rawOrigin = process.env.CORS_ORIGIN || 'http://localhost:5173';
+const allowedOrigin = rawOrigin.replace(/\/+$/, '');
+
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  origin: function(origin, callback) {
+    // Allow requests with no origin (curl, Postman, server-to-server)
+    if (!origin) return callback(null, true);
+    // Strip trailing slash from incoming origin for comparison
+    const normalizedOrigin = origin.replace(/\/+$/, '');
+    if (normalizedOrigin === allowedOrigin) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS: ' + origin));
+    }
+  },
   credentials: true,
 }));
 app.use(express.json());
