@@ -5,6 +5,14 @@ import { useCart } from '../context/CartContext';
 import { useToast } from '../context/ToastContext';
 import { useTheme } from '../context/ThemeContext';
 
+const getDocsUrl = () => {
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (!envUrl) return "/api-docs";
+  const cleanUrl = envUrl.replace(/\/+$/, "");
+  const baseUrl = cleanUrl.endsWith("/api") ? cleanUrl.slice(0, -4) : cleanUrl;
+  return `${baseUrl}/api-docs`;
+};
+
 export const Navbar = () => {
   const { isAuthenticated, user, logout } = useAuth();
   const { cartCount } = useCart();
@@ -69,7 +77,7 @@ export const Navbar = () => {
           </NavLink>
 
           <a
-            href="/api-docs"
+            href={getDocsUrl()}
             target="_blank"
             rel="noopener noreferrer"
             className="nav-link"
