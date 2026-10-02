@@ -146,31 +146,6 @@ To test protected API endpoints, you need a JWT Bearer Token.
     },
   },
   paths: {
-    '/api/health': {
-      get: {
-        summary: 'System health check',
-        description: 'Returns the health status, uptime, and current server timestamp.',
-        tags: ['Utility'],
-        responses: {
-          200: {
-            description: 'API is running normally',
-            content: {
-              'application/json': {
-                schema: {
-                  type: 'object',
-                  properties: {
-                    success: { type: 'boolean', example: true },
-                    status: { type: 'string', example: 'ok' },
-                    timestamp: { type: 'string' },
-                    uptime: { type: 'number' },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    },
     '/api/auth/register': {
       post: {
         summary: 'Register a new user',
@@ -224,7 +199,8 @@ To test protected API endpoints, you need a JWT Bearer Token.
     },
     '/api/auth/login': {
       post: {
-        summary: 'Authenticate user and return JWT tokens',
+        summary: 'Authenticate user and return JWT Bearer token',
+        description: 'Login with either email or username (admin@test.com / user@test.com or shorthand admin / user) and password to get a JWT accessToken.',
         tags: ['Auth'],
         requestBody: {
           required: true,
@@ -232,10 +208,11 @@ To test protected API endpoints, you need a JWT Bearer Token.
             'application/json': {
               schema: {
                 type: 'object',
-                required: ['email', 'password'],
+                required: ['password'],
                 properties: {
-                  email: { type: 'string', example: 'user@test.com' },
-                  password: { type: 'string', example: 'User@123' },
+                  email: { type: 'string', example: 'admin@test.com', description: 'User email or username' },
+                  username: { type: 'string', example: 'admin', description: 'Alternative to email' },
+                  password: { type: 'string', example: 'Admin@123', description: 'Account password' },
                 },
               },
             },
@@ -243,7 +220,7 @@ To test protected API endpoints, you need a JWT Bearer Token.
         },
         responses: {
           200: {
-            description: 'Login successful',
+            description: 'Login successful - returns JWT token',
             content: {
               'application/json': {
                 schema: {
@@ -251,11 +228,19 @@ To test protected API endpoints, you need a JWT Bearer Token.
                   properties: {
                     success: { type: 'boolean', example: true },
                     message: { type: 'string', example: 'Login successful' },
-                    user: { $ref: '#/components/schemas/User' },
-                    accessToken: { type: 'string' },
-                    refreshToken: { type: 'string' },
+                    accessToken: {
+                      type: 'string',
+                      example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJhZG1pbkB0ZXN0LmNvbSIsInJvbGUiOiJhZG1pbiJ9.demo_token',
+                      description: 'JWT Bearer token for authorization'
+                    },
+                    token: {
+                      type: 'string',
+                      example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJhZG1pbkB0ZXN0LmNvbSIsInJvbGUiOiJhZG1pbiJ9.demo_token',
+                      description: 'Alias for accessToken'
+                    },
                     tokenType: { type: 'string', example: 'Bearer' },
                     expiresIn: { type: 'string', example: '15m' },
+                    user: { $ref: '#/components/schemas/User' },
                   },
                 },
               },
@@ -267,53 +252,6 @@ To test protected API endpoints, you need a JWT Bearer Token.
           },
           422: {
             description: 'Validation failed',
-            content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } },
-          },
-        },
-      },
-    },
-    '/api/auth/refresh': {
-      post: {
-        summary: 'Refresh access token using refreshToken',
-        tags: ['Auth'],
-        requestBody: {
-          required: true,
-          content: {
-            'application/json': {
-              schema: {
-                type: 'object',
-                required: ['refreshToken'],
-                properties: {
-                  refreshToken: { type: 'string' },
-                },
-              },
-            },
-          },
-        },
-        responses: {
-          200: {
-            description: 'New token pair generated',
-            content: {
-              'application/json': {
-                schema: {
-                  type: 'object',
-                  properties: {
-                    success: { type: 'boolean', example: true },
-                    accessToken: { type: 'string' },
-                    refreshToken: { type: 'string' },
-                    tokenType: { type: 'string', example: 'Bearer' },
-                    expiresIn: { type: 'string', example: '15m' },
-                  },
-                },
-              },
-            },
-          },
-          401: {
-            description: 'Invalid, revoked or expired refresh token',
-            content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } },
-          },
-          422: {
-            description: 'Missing refresh token parameter',
             content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } },
           },
         },
@@ -383,122 +321,6 @@ To test protected API endpoints, you need a JWT Bearer Token.
             description: 'Missing or expired token',
             content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } },
           },
-        },
-      },
-    },
-    '/api/users': {
-      get: {
-        summary: 'List all users (Admin only)',
-        security: [{ bearerAuth: [] }],
-        tags: ['Users'],
-        responses: {
-          200: {
-            description: 'List of all users',
-            content: {
-              'application/json': {
-                schema: {
-                  type: 'object',
-                  properties: {
-                    success: { type: 'boolean', example: true },
-                    users: {
-                      type: 'array',
-                      items: { $ref: '#/components/schemas/User' },
-                    },
-                  },
-                },
-              },
-            },
-          },
-          401: { description: 'Missing or invalid token' },
-          403: { description: 'Admin access required' },
-        },
-      },
-    },
-    '/api/users/{id}': {
-      get: {
-        summary: 'Get user by ID (Owner or Admin)',
-        security: [{ bearerAuth: [] }],
-        tags: ['Users'],
-        parameters: [
-          { name: 'id', in: 'path', required: true, schema: { type: 'integer' } },
-        ],
-        responses: {
-          200: {
-            description: 'User details',
-            content: {
-              'application/json': {
-                schema: {
-                  type: 'object',
-                  properties: {
-                    success: { type: 'boolean', example: true },
-                    user: { $ref: '#/components/schemas/User' },
-                  },
-                },
-              },
-            },
-          },
-          401: { description: 'Missing or invalid token' },
-          403: { description: 'Access denied (not owner or admin)' },
-          404: { description: 'User not found' },
-        },
-      },
-      put: {
-        summary: 'Update user profile (Owner or Admin)',
-        security: [{ bearerAuth: [] }],
-        tags: ['Users'],
-        parameters: [
-          { name: 'id', in: 'path', required: true, schema: { type: 'integer' } },
-        ],
-        requestBody: {
-          required: true,
-          content: {
-            'application/json': {
-              schema: {
-                type: 'object',
-                properties: {
-                  name: { type: 'string', example: 'Updated Name' },
-                  email: { type: 'string', format: 'email', example: 'updated@test.com' },
-                },
-              },
-            },
-          },
-        },
-        responses: {
-          200: {
-            description: 'User updated successfully',
-            content: {
-              'application/json': {
-                schema: {
-                  type: 'object',
-                  properties: {
-                    success: { type: 'boolean', example: true },
-                    message: { type: 'string', example: 'User updated successfully' },
-                    user: { $ref: '#/components/schemas/User' },
-                  },
-                },
-              },
-            },
-          },
-          401: { description: 'Missing or invalid token' },
-          403: { description: 'Access denied' },
-          404: { description: 'User not found' },
-          409: { description: 'Email already in use' },
-          422: { description: 'Validation failed' },
-        },
-      },
-      delete: {
-        summary: 'Delete user by ID (Admin only, cannot delete self)',
-        security: [{ bearerAuth: [] }],
-        tags: ['Users'],
-        parameters: [
-          { name: 'id', in: 'path', required: true, schema: { type: 'integer' } },
-        ],
-        responses: {
-          204: { description: 'User deleted successfully (no content)' },
-          400: { description: 'Cannot delete own account' },
-          401: { description: 'Missing or invalid token' },
-          403: { description: 'Admin access required' },
-          404: { description: 'User not found' },
         },
       },
     },
@@ -880,31 +702,6 @@ To test protected API endpoints, you need a JWT Bearer Token.
         },
       },
     },
-    '/api/admin/reset-db': {
-      post: {
-        summary: 'Reset database to seed data (Admin token required)',
-        security: [{ bearerAuth: [] }],
-        tags: ['Utility'],
-        responses: {
-          200: {
-            description: 'Database reset to seed data',
-            content: {
-              'application/json': {
-                schema: {
-                  type: 'object',
-                  properties: {
-                    success: { type: 'boolean', example: true },
-                    message: { type: 'string', example: 'Database reset to seed data successfully' },
-                  },
-                },
-              },
-            },
-          },
-          401: { description: 'Missing or invalid token' },
-          403: { description: 'Admin access required' },
-        },
-      },
-    },
   },
 };
 
@@ -931,14 +728,295 @@ function setupSwagger(app) {
     res.send(openapiSpecification);
   });
 
+const customCss = `
+    .swagger-ui .topbar { display: none; }
+    .qa-auth-banner {
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      border: 1px solid #3b82f6;
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin: 20px auto 24px auto;
+      max-width: 1460px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 0 15px rgba(59, 130, 246, 0.2);
+      color: #f8fafc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    .qa-auth-banner h3 {
+      margin: 0 0 10px 0;
+      color: #38bdf8;
+      font-size: 1.25rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .qa-auth-presets {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .qa-preset-btn {
+      background: #1e293b;
+      color: #e2e8f0;
+      border: 1px solid #475569;
+      padding: 7px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.875rem;
+      transition: all 0.2s ease;
+    }
+    .qa-preset-btn:hover {
+      background: #0284c7;
+      color: #ffffff;
+      border-color: #38bdf8;
+      transform: translateY(-1px);
+    }
+    .qa-auth-form {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      align-items: flex-end;
+    }
+    .qa-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1;
+      min-width: 220px;
+    }
+    .qa-field label {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .qa-field input {
+      background: #090d16;
+      border: 1px solid #475569;
+      border-radius: 6px;
+      padding: 10px 14px;
+      color: #f8fafc;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .qa-field input:focus {
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+    }
+    .qa-submit-btn {
+      background: #2563eb;
+      color: white;
+      border: none;
+      padding: 10px 22px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      height: 42px;
+      white-space: nowrap;
+    }
+    .qa-submit-btn:hover {
+      background: #1d4ed8;
+      transform: translateY(-1px);
+    }
+    .qa-token-box {
+      margin-top: 16px;
+      background: #090d16;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 14px;
+    }
+    .qa-token-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 0.875rem;
+    }
+    .qa-token-input {
+      width: 100%;
+      background: #1e293b;
+      border: 1px solid #475569;
+      color: #38bdf8;
+      font-family: monospace;
+      font-size: 0.82rem;
+      padding: 8px 12px;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+    .qa-copy-btn {
+      background: #10b981;
+      color: white;
+      border: none;
+      padding: 5px 14px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.82rem;
+      transition: background 0.2s;
+    }
+    .qa-copy-btn:hover {
+      background: #059669;
+    }
+  `;
+
+  const customJsStr = `
+    function injectQuickAuth() {
+      var wrapper = document.querySelector("#swagger-ui");
+      if (!wrapper || document.getElementById("qa-quick-auth")) return;
+
+      var banner = document.createElement("div");
+      banner.id = "qa-quick-auth";
+      banner.className = "qa-auth-banner";
+      banner.innerHTML = "<div class='qa-inner'>" +
+        "<h3>⚡ Quick JWT Authentication & Token Generator</h3>" +
+        "<p style='margin: 0 0 14px 0; color: #94a3b8; font-size: 0.9rem;'>" +
+          "Generate a JWT Bearer token instantly for testing protected endpoints. Click 1-Click Fill or enter credentials to automatically authorize Swagger UI." +
+        "</p>" +
+        "<div class='qa-auth-presets'>" +
+          "<span style='color:#cbd5e1; font-size:0.875rem; font-weight:600;'>1-Click Quick Fill:</span>" +
+          "<button type='button' class='qa-preset-btn' id='qa-btn-admin'>👑 Admin (admin@test.com)</button>" +
+          "<button type='button' class='qa-preset-btn' id='qa-btn-user'>👤 User (user@test.com)</button>" +
+        "</div>" +
+        "<form class='qa-auth-form' id='qa-login-form'>" +
+          "<div class='qa-field'>" +
+            "<label>Email or Username</label>" +
+            "<input type='text' id='qa-input-user' value='admin@test.com' placeholder='admin@test.com' required />" +
+          "</div>" +
+          "<div class='qa-field'>" +
+            "<label>Password</label>" +
+            "<input type='password' id='qa-input-pass' value='Admin@123' placeholder='Password' required />" +
+          "</div>" +
+          "<button type='submit' class='qa-submit-btn' id='qa-btn-submit'>🔑 Generate Token & Authorize</button>" +
+        "</form>" +
+        "<div id='qa-token-container' class='qa-token-box' style='display:none;'>" +
+          "<div class='qa-token-header'>" +
+            "<span id='qa-token-status' style='color:#34d399; font-weight:600;'>✅ Token Generated & Swagger UI Authorized!</span>" +
+            "<button type='button' class='qa-copy-btn' id='qa-btn-copy'>📋 Copy Token</button>" +
+          "</div>" +
+          "<input type='text' readonly id='qa-token-val' class='qa-token-input' />" +
+        "</div>" +
+      "</div>";
+
+      wrapper.insertBefore(banner, wrapper.firstChild);
+
+      function doLogin(emailOrUser, password) {
+        var statusEl = document.getElementById("qa-token-status");
+        var tokenBox = document.getElementById("qa-token-container");
+        var tokenInput = document.getElementById("qa-token-val");
+        var submitBtn = document.getElementById("qa-btn-submit");
+
+        submitBtn.textContent = "Authenticating...";
+        submitBtn.disabled = true;
+
+        fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: emailOrUser, username: emailOrUser, password: password })
+        })
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+          submitBtn.textContent = "🔑 Generate Token & Authorize";
+          submitBtn.disabled = false;
+
+          var token = data.accessToken || data.token || data.jwt;
+          if (token) {
+            tokenBox.style.display = "block";
+            tokenInput.value = token;
+            var role = (data.user && data.user.role) ? data.user.role.toUpperCase() : "USER";
+            var email = (data.user && data.user.email) ? data.user.email : emailOrUser;
+            statusEl.textContent = "✅ Authorized as [" + role + "] " + email + " — Swagger UI is now AUTHORIZED (🔒)";
+            statusEl.style.color = "#34d399";
+
+            if (window.ui) {
+              try {
+                window.ui.authActions.authorize({
+                  bearerAuth: {
+                    name: "bearerAuth",
+                    schema: { type: "http", in: "header", scheme: "bearer", bearerFormat: "JWT" },
+                    value: token
+                  }
+                });
+                if (window.ui.preauthorizeApiKey) {
+                  window.ui.preauthorizeApiKey("bearerAuth", token);
+                }
+              } catch (err) {
+                console.warn("Swagger authorization error:", err);
+              }
+            }
+          } else {
+            tokenBox.style.display = "block";
+            statusEl.textContent = "❌ Login failed: " + (data.message || "Invalid credentials");
+            statusEl.style.color = "#f87171";
+            tokenInput.value = JSON.stringify(data);
+          }
+        })
+        .catch(function(err) {
+          submitBtn.textContent = "🔑 Generate Token & Authorize";
+          submitBtn.disabled = false;
+          tokenBox.style.display = "block";
+          statusEl.textContent = "❌ Request failed: " + err.message;
+          statusEl.style.color = "#f87171";
+        });
+      }
+
+      document.getElementById("qa-btn-admin").addEventListener("click", function() {
+        document.getElementById("qa-input-user").value = "admin@test.com";
+        document.getElementById("qa-input-pass").value = "Admin@123";
+        doLogin("admin@test.com", "Admin@123");
+      });
+
+      document.getElementById("qa-btn-user").addEventListener("click", function() {
+        document.getElementById("qa-input-user").value = "user@test.com";
+        document.getElementById("qa-input-pass").value = "User@123";
+        doLogin("user@test.com", "User@123");
+      });
+
+      document.getElementById("qa-login-form").addEventListener("submit", function(e) {
+        e.preventDefault();
+        var u = document.getElementById("qa-input-user").value.trim();
+        var p = document.getElementById("qa-input-pass").value;
+        doLogin(u, p);
+      });
+
+      document.getElementById("qa-btn-copy").addEventListener("click", function() {
+        var val = document.getElementById("qa-token-val");
+        val.select();
+        navigator.clipboard.writeText(val.value).then(function() {
+          var btn = document.getElementById("qa-btn-copy");
+          btn.textContent = "✅ Copied!";
+          setTimeout(function() { btn.textContent = "📋 Copy Token"; }, 2000);
+        });
+      });
+    }
+
+    var authPoll = setInterval(function() {
+      if (document.querySelector("#swagger-ui") && window.ui) {
+        clearInterval(authPoll);
+        injectQuickAuth();
+      }
+    }, 150);
+  `;
+
   // Serve Swagger UI at /api-docs
   app.use(
-    '/api-docs',
+    "/api-docs",
     swaggerUi.serve,
     swaggerUi.setup(openapiSpecification, {
-      customSiteTitle: 'QA Playground API Documentation',
+      customSiteTitle: "QA Playground API Documentation",
+      customCss: customCss,
+      customJsStr: customJsStr,
       swaggerOptions: {
         persistAuthorization: true,
+        displayRequestDuration: true,
+        docExpansion: "list",
+        filter: true,
       },
     })
   );

@@ -67,8 +67,9 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Auth routes
+// Auth routes (supported with /api/auth and /auth alias)
 app.use('/api/auth', authRoutes);
+app.use('/auth', authRoutes);
 
 // User routes
 app.use('/api/users', userRoutes);

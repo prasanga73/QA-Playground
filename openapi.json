@@ -3,13 +3,17 @@
   "info": {
     "title": "QA Playground REST API",
     "version": "1.0.0",
-    "description": "REST API designed for practicing manual, API, automation, and performance testing. Includes comprehensive error handling, JWT auth with refresh tokens, role-based access control, cart, products, and order management.",
+    "description": "REST API designed for practicing manual, API, automation, and performance testing. Includes comprehensive error handling, JWT auth with refresh tokens, role-based access control, cart, products, and order management.\n\n### 🔐 Quick Start & Authentication Guide\n\nTo test protected API endpoints, you need a JWT Bearer Token.\n\n#### 1. Default Credentials for Testing\n| Role | Email | Password |\n|---|---|---|\n| **Admin** | `admin@test.com` | `Admin@123` |\n| **User** | `user@test.com` | `User@123` |\n\n#### 2. How to Obtain & Apply Your JWT Bearer Token\n1. **Login**: Expand **Auth** → `POST /api/auth/login` below.\n2. **Execute**: Click **Try it out**, enter your credentials (e.g. `admin@test.com` / `Admin@123`), and click **Execute**.\n3. **Copy Token**: Copy the `accessToken` string from the response JSON.\n4. **Authorize**: Click the green **Authorize 🔓** button at the top-right of this page.\n5. **Paste & Save**: Paste your token into the **Value** field and click **Authorize**. All subsequent requests will now automatically include your Bearer token!",
     "contact": {
       "name": "QA Playground Team",
       "email": "support@qaplayground.local"
     }
   },
   "servers": [
+    {
+      "url": "/",
+      "description": "Current Environment (Auto/Relative)"
+    },
     {
       "url": "http://localhost:3001",
       "description": "Local Development Server"
@@ -277,43 +281,6 @@
     }
   },
   "paths": {
-    "/api/health": {
-      "get": {
-        "summary": "System health check",
-        "description": "Returns the health status, uptime, and current server timestamp.",
-        "tags": [
-          "Utility"
-        ],
-        "responses": {
-          "200": {
-            "description": "API is running normally",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "status": {
-                      "type": "string",
-                      "example": "ok"
-                    },
-                    "timestamp": {
-                      "type": "string"
-                    },
-                    "uptime": {
-                      "type": "number"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/auth/register": {
       "post": {
         "summary": "Register a new user",
@@ -413,7 +380,8 @@
     },
     "/api/auth/login": {
       "post": {
-        "summary": "Authenticate user and return JWT tokens",
+        "summary": "Authenticate user and return JWT Bearer token",
+        "description": "Login with either email or username (admin@test.com / user@test.com or shorthand admin / user) and password to get a JWT accessToken.",
         "tags": [
           "Auth"
         ],
@@ -424,17 +392,23 @@
               "schema": {
                 "type": "object",
                 "required": [
-                  "email",
                   "password"
                 ],
                 "properties": {
                   "email": {
                     "type": "string",
-                    "example": "user@test.com"
+                    "example": "admin@test.com",
+                    "description": "User email or username"
+                  },
+                  "username": {
+                    "type": "string",
+                    "example": "admin",
+                    "description": "Alternative to email"
                   },
                   "password": {
                     "type": "string",
-                    "example": "User@123"
+                    "example": "Admin@123",
+                    "description": "Account password"
                   }
                 }
               }
@@ -443,7 +417,7 @@
         },
         "responses": {
           "200": {
-            "description": "Login successful",
+            "description": "Login successful - returns JWT token",
             "content": {
               "application/json": {
                 "schema": {
@@ -457,14 +431,15 @@
                       "type": "string",
                       "example": "Login successful"
                     },
-                    "user": {
-                      "$ref": "#/components/schemas/User"
-                    },
                     "accessToken": {
-                      "type": "string"
+                      "type": "string",
+                      "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJhZG1pbkB0ZXN0LmNvbSIsInJvbGUiOiJhZG1pbiJ9.demo_token",
+                      "description": "JWT Bearer token for authorization"
                     },
-                    "refreshToken": {
-                      "type": "string"
+                    "token": {
+                      "type": "string",
+                      "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJhZG1pbkB0ZXN0LmNvbSIsInJvbGUiOiJhZG1pbiJ9.demo_token",
+                      "description": "Alias for accessToken"
                     },
                     "tokenType": {
                       "type": "string",
@@ -473,6 +448,9 @@
                     "expiresIn": {
                       "type": "string",
                       "example": "15m"
+                    },
+                    "user": {
+                      "$ref": "#/components/schemas/User"
                     }
                   }
                 }
@@ -491,84 +469,6 @@
           },
           "422": {
             "description": "Validation failed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/auth/refresh": {
-      "post": {
-        "summary": "Refresh access token using refreshToken",
-        "tags": [
-          "Auth"
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "refreshToken"
-                ],
-                "properties": {
-                  "refreshToken": {
-                    "type": "string"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "New token pair generated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "accessToken": {
-                      "type": "string"
-                    },
-                    "refreshToken": {
-                      "type": "string"
-                    },
-                    "tokenType": {
-                      "type": "string",
-                      "example": "Bearer"
-                    },
-                    "expiresIn": {
-                      "type": "string",
-                      "example": "15m"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Invalid, revoked or expired refresh token",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Missing refresh token parameter",
             "content": {
               "application/json": {
                 "schema": {
@@ -680,222 +580,6 @@
                 }
               }
             }
-          }
-        }
-      }
-    },
-    "/api/users": {
-      "get": {
-        "summary": "List all users (Admin only)",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "tags": [
-          "Users"
-        ],
-        "responses": {
-          "200": {
-            "description": "List of all users",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "users": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/User"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid token"
-          },
-          "403": {
-            "description": "Admin access required"
-          }
-        }
-      }
-    },
-    "/api/users/{id}": {
-      "get": {
-        "summary": "Get user by ID (Owner or Admin)",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "tags": [
-          "Users"
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "User details",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "user": {
-                      "$ref": "#/components/schemas/User"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid token"
-          },
-          "403": {
-            "description": "Access denied (not owner or admin)"
-          },
-          "404": {
-            "description": "User not found"
-          }
-        }
-      },
-      "put": {
-        "summary": "Update user profile (Owner or Admin)",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "tags": [
-          "Users"
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "example": "Updated Name"
-                  },
-                  "email": {
-                    "type": "string",
-                    "format": "email",
-                    "example": "updated@test.com"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "User updated successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "message": {
-                      "type": "string",
-                      "example": "User updated successfully"
-                    },
-                    "user": {
-                      "$ref": "#/components/schemas/User"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid token"
-          },
-          "403": {
-            "description": "Access denied"
-          },
-          "404": {
-            "description": "User not found"
-          },
-          "409": {
-            "description": "Email already in use"
-          },
-          "422": {
-            "description": "Validation failed"
-          }
-        }
-      },
-      "delete": {
-        "summary": "Delete user by ID (Admin only, cannot delete self)",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "tags": [
-          "Users"
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "User deleted successfully (no content)"
-          },
-          "400": {
-            "description": "Cannot delete own account"
-          },
-          "401": {
-            "description": "Missing or invalid token"
-          },
-          "403": {
-            "description": "Admin access required"
-          },
-          "404": {
-            "description": "User not found"
           }
         }
       }
@@ -1632,47 +1316,6 @@
           },
           "404": {
             "description": "Order not found"
-          }
-        }
-      }
-    },
-    "/api/admin/reset-db": {
-      "post": {
-        "summary": "Reset database to seed data (Admin token required)",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "tags": [
-          "Utility"
-        ],
-        "responses": {
-          "200": {
-            "description": "Database reset to seed data",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "message": {
-                      "type": "string",
-                      "example": "Database reset to seed data successfully"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid token"
-          },
-          "403": {
-            "description": "Admin access required"
           }
         }
       }
