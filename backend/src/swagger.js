@@ -385,9 +385,13 @@ const openapiSpecification = {
         summary: 'Get orders (own for users, all for admin)',
         security: [{ bearerAuth: [] }],
         tags: ['Orders'],
+        parameters: [
+          { name: 'page', in: 'query', schema: { type: 'integer', minimum: 1, default: 1 } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 100, default: 20 } },
+        ],
         responses: {
           200: {
-            description: 'List of orders',
+            description: 'Paginated list of orders',
             content: {
               'application/json': {
                 schema: {
@@ -395,6 +399,15 @@ const openapiSpecification = {
                   properties: {
                     success: { type: 'boolean', example: true },
                     orders: { type: 'array', items: { $ref: '#/components/schemas/Order' } },
+                    pagination: {
+                      type: 'object',
+                      properties: {
+                        page: { type: 'integer' },
+                        limit: { type: 'integer' },
+                        total: { type: 'integer' },
+                        totalPages: { type: 'integer' },
+                      },
+                    },
                   },
                 },
               },

@@ -9,6 +9,8 @@ export const OrdersPage = () => {
 
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
   const [expandedOrderId, setExpandedOrderId] = useState(null);
   const [orderDetails, setOrderDetails] = useState({});
   const [loadingDetails, setLoadingDetails] = useState({});
@@ -20,16 +22,17 @@ export const OrdersPage = () => {
   const fetchOrders = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await api.get('/orders');
+      const response = await api.get('/orders', { params: { page, limit: 20 } });
       if (response.data.success) {
         setOrders(response.data.orders || []);
+        setPagination(response.data.pagination || { page, limit: 20, total: 0, totalPages: 1 });
       }
     } catch (err) {
       showError(err.response?.data?.message || 'Failed to fetch order history');
     } finally {
       setLoading(false);
     }
-  }, [showError]);
+  }, [page, showError]);
 
   useEffect(() => {
     fetchOrders();
@@ -163,9 +166,10 @@ export const OrdersPage = () => {
           </Link>
         </div>
       ) : (
-        <div className="orders-table-wrapper">
-          <div className="table-responsive">
-            <table className="app-table orders-table" data-testid="orders-table">
+        <>
+          <div className="orders-table-wrapper">
+            <div className="table-responsive">
+              <table className="app-table orders-table" data-testid="orders-table">
               <thead>
                 <tr>
                   <th>Order ID</th>
@@ -294,9 +298,35 @@ export const OrdersPage = () => {
                   );
                 })}
               </tbody>
-            </table>
+              </table>
+            </div>
           </div>
-        </div>
+          {pagination.totalPages > 1 && (
+            <div className="pagination-wrapper" data-testid="orders-pagination">
+              <button
+                type="button"
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                disabled={page <= 1}
+                className="btn btn-outline-secondary pagination-btn"
+                data-testid="orders-pagination-prev"
+              >
+                Previous
+              </button>
+              <span aria-live="polite">
+                Page {pagination.page} of {pagination.totalPages} ({pagination.total} orders)
+              </span>
+              <button
+                type="button"
+                onClick={() => setPage((current) => Math.min(pagination.totalPages, current + 1))}
+                disabled={page >= pagination.totalPages}
+                className="btn btn-outline-secondary pagination-btn"
+                data-testid="orders-pagination-next"
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </>
       )}
 
       {/* Confirmation Dialog for Cancellation */}

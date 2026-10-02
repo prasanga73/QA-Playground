@@ -94,6 +94,11 @@ function initializeDatabase() {
       expires_at TEXT NOT NULL,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+
+    CREATE INDEX IF NOT EXISTS idx_orders_user_created
+      ON orders(user_id, created_at DESC, id DESC);
+    CREATE INDEX IF NOT EXISTS idx_order_items_order
+      ON order_items(order_id);
   `);
 
   return database;

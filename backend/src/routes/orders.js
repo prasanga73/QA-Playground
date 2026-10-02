@@ -95,22 +95,44 @@ router.post('/', authenticate, (req, res) => {
  */
 router.get('/', authenticate, (req, res) => {
   const db = getDb();
+  const pageNum = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const limitNum = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+  const offset = (pageNum - 1) * limitNum;
 
+  let total;
   let orders;
   if (req.user.role === 'admin') {
-    orders = db.prepare('SELECT * FROM orders ORDER BY created_at DESC').all();
+    total = db.prepare('SELECT COUNT(*) as total FROM orders').get().total;
+    orders = db.prepare(`
+      SELECT o.*, COUNT(oi.id) as itemCount
+      FROM orders o
+      LEFT JOIN order_items oi ON oi.order_id = o.id
+      GROUP BY o.id
+      ORDER BY o.created_at DESC, o.id DESC
+      LIMIT ? OFFSET ?
+    `).all(limitNum, offset);
   } else {
-    orders = db.prepare('SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC').all(req.user.id);
+    total = db.prepare('SELECT COUNT(*) as total FROM orders WHERE user_id = ?').get(req.user.id).total;
+    orders = db.prepare(`
+      SELECT o.*, COUNT(oi.id) as itemCount
+      FROM orders o
+      LEFT JOIN order_items oi ON oi.order_id = o.id
+      WHERE o.user_id = ?
+      GROUP BY o.id
+      ORDER BY o.created_at DESC, o.id DESC
+      LIMIT ? OFFSET ?
+    `).all(req.user.id, limitNum, offset);
   }
 
-  // Get item counts for each order
-  const getItemCount = db.prepare('SELECT COUNT(*) as count FROM order_items WHERE order_id = ?');
-  orders = orders.map(order => ({
-    ...order,
-    itemCount: getItemCount.get(order.id).count,
-  }));
-
-  return successResponse(res, { orders });
+  return successResponse(res, {
+    orders,
+    pagination: {
+      page: pageNum,
+      limit: limitNum,
+      total,
+      totalPages: Math.ceil(total / limitNum),
+    },
+  });
 });
 
 /**

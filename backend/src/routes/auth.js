@@ -27,7 +27,7 @@ function generateRefreshToken(user) {
 /**
  * POST /api/auth/register
  */
-router.post('/register', (req, res) => {
+router.post('/register', async (req, res, next) => {
   const { name, email, password } = req.body;
 
   // Validate required fields
@@ -62,7 +62,12 @@ router.post('/register', (req, res) => {
   }
 
   // Hash password and create user
-  const hashedPassword = bcrypt.hashSync(password, 10);
+  let hashedPassword;
+  try {
+    hashedPassword = await bcrypt.hash(password, 10);
+  } catch (err) {
+    return next(err);
+  }
   const result = db.prepare(
     'INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)'
   ).run(name.trim(), email.trim().toLowerCase(), hashedPassword, 'user');
@@ -85,7 +90,7 @@ router.post('/register', (req, res) => {
 /**
  * POST /api/auth/login
  */
-router.post('/login', (req, res) => {
+router.post('/login', async (req, res, next) => {
   const identifier = req.body.email || req.body.username;
   const { password } = req.body;
 
@@ -112,7 +117,12 @@ router.post('/login', (req, res) => {
     return errorResponse(res, 401, 'Invalid email or password', 'INVALID_CREDENTIALS');
   }
 
-  const validPassword = bcrypt.compareSync(password, user.password);
+  let validPassword;
+  try {
+    validPassword = await bcrypt.compare(password, user.password);
+  } catch (err) {
+    return next(err);
+  }
   if (!validPassword) {
     return errorResponse(res, 401, 'Invalid email or password', 'INVALID_CREDENTIALS');
   }
