@@ -86,7 +86,7 @@ router.post('/register', (req, res) => {
  * POST /api/auth/login
  */
 router.post('/login', (req, res) => {
-  const identifier = req.body.email || req.body.username || req.body.user;
+  const identifier = req.body.email || req.body.username;
   const { password } = req.body;
 
   if (!identifier || !password) {
@@ -96,13 +96,10 @@ router.post('/login', (req, res) => {
     return errorResponse(res, 422, 'Validation failed', 'VALIDATION_ERROR', details);
   }
 
-  const db = getDb();
   const cleanId = String(identifier).trim().toLowerCase();
-
-  // Search by exact email or name
+  const db = getDb();
   let user = db.prepare('SELECT * FROM users WHERE LOWER(email) = ? OR LOWER(name) = ?').get(cleanId, cleanId);
 
-  // If not found, check shorthand aliases ("admin", "user")
   if (!user) {
     if (cleanId === 'admin') {
       user = db.prepare('SELECT * FROM users WHERE role = "admin" ORDER BY id ASC LIMIT 1').get();
@@ -112,12 +109,12 @@ router.post('/login', (req, res) => {
   }
 
   if (!user) {
-    return errorResponse(res, 401, 'Invalid email/username or password', 'INVALID_CREDENTIALS');
+    return errorResponse(res, 401, 'Invalid email or password', 'INVALID_CREDENTIALS');
   }
 
   const validPassword = bcrypt.compareSync(password, user.password);
   if (!validPassword) {
-    return errorResponse(res, 401, 'Invalid email/username or password', 'INVALID_CREDENTIALS');
+    return errorResponse(res, 401, 'Invalid email or password', 'INVALID_CREDENTIALS');
   }
 
   const accessToken = generateAccessToken(user);
@@ -127,9 +124,6 @@ router.post('/login', (req, res) => {
     message: 'Login successful',
     user: { id: user.id, name: user.name, email: user.email, role: user.role },
     accessToken,
-    token: accessToken,
-    access_token: accessToken,
-    jwt: accessToken,
     refreshToken,
     tokenType: 'Bearer',
     expiresIn: process.env.JWT_ACCESS_EXPIRY || '15m',
