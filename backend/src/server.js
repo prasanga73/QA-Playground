@@ -1,0 +1,107 @@
+require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+const morgan = require('morgan');
+const { initializeDatabase, getDb } = require('./database');
+const { seed } = require('./seed');
+const { authenticate, requireAdmin } = require('./middleware/auth');
+const { successResponse, errorResponse } = require('./utils/responses');
+
+// Import routes
+const authRoutes = require('./routes/auth');
+const userRoutes = require('./routes/users');
+const productRoutes = require('./routes/products');
+const cartRoutes = require('./routes/cart');
+const orderRoutes = require('./routes/orders');
+
+const path = require('path');
+const fs = require('fs');
+
+const app = express();
+const PORT = process.env.PORT || 3001;
+
+// Middleware
+app.use(cors({
+  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  credentials: true,
+}));
+app.use(express.json());
+app.use(morgan('dev'));
+
+// Static file serving for images
+app.use('/images', express.static(path.resolve(__dirname, '../public/images')));
+
+// Initialize database
+initializeDatabase();
+
+// Seed database if empty
+const db = getDb();
+const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get();
+if (userCount.count === 0) {
+  console.log('📦 Database is empty. Running seed...');
+  seed();
+}
+
+// ===== ROUTES =====
+
+// Health check
+app.get('/api/health', (req, res) => {
+  return successResponse(res, {
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+  });
+});
+
+// Auth routes
+app.use('/api/auth', authRoutes);
+
+// User routes
+app.use('/api/users', userRoutes);
+
+// Product routes
+app.use('/api/products', productRoutes);
+
+// Cart routes
+app.use('/api/cart', cartRoutes);
+
+// Order routes
+app.use('/api/orders', orderRoutes);
+
+// Admin: Reset DB
+app.post('/api/admin/reset-db', authenticate, requireAdmin, (req, res) => {
+  try {
+    seed();
+    return successResponse(res, { message: 'Database reset to seed data successfully' });
+  } catch (err) {
+    return errorResponse(res, 500, 'Failed to reset database', 'RESET_ERROR');
+  }
+});
+
+// Swagger (lazy-loaded, set up in phase 5)
+try {
+  const swaggerSetup = require('./swagger');
+  swaggerSetup(app);
+} catch (e) {
+  // Swagger not configured yet
+}
+
+// 404 handler
+app.use((req, res) => {
+  return errorResponse(res, 404, `Route ${req.method} ${req.path} not found`, 'ROUTE_NOT_FOUND');
+});
+
+// Error handler
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  return errorResponse(res, 500, 'Internal server error', 'INTERNAL_ERROR');
+});
+
+// Start server
+app.listen(PORT, () => {
+  console.log(`\n🚀 QA Playground API running on http://localhost:${PORT}`);
+  console.log(`📋 Health check: http://localhost:${PORT}/api/health`);
+  console.log(`📖 API docs: http://localhost:${PORT}/api-docs (after Phase 5)\n`);
+});
+
+module.exports = app;

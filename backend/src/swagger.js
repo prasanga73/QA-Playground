@@ -1,0 +1,928 @@
+const swaggerUi = require('swagger-ui-express');
+const fs = require('fs');
+const path = require('path');
+
+const openapiSpecification = {
+  openapi: '3.0.3',
+  info: {
+    title: 'QA Playground REST API',
+    version: '1.0.0',
+    description: 'REST API designed for practicing manual, API, automation, and performance testing. Includes comprehensive error handling, JWT auth with refresh tokens, role-based access control, cart, products, and order management.',
+    contact: {
+      name: 'QA Playground Team',
+      email: 'support@qaplayground.local',
+    },
+  },
+  servers: [
+    {
+      url: 'http://localhost:3001',
+      description: 'Local Development Server',
+    },
+  ],
+  components: {
+    securitySchemes: {
+      bearerAuth: {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        description: 'Enter your JWT access token obtained from /api/auth/login or /api/auth/register',
+      },
+    },
+    schemas: {
+      ErrorResponse: {
+        type: 'object',
+        properties: {
+          success: { type: 'boolean', example: false },
+          message: { type: 'string', example: 'Validation failed' },
+          errorCode: { type: 'string', example: 'VALIDATION_ERROR' },
+          details: {
+            type: 'array',
+            items: { type: 'string' },
+            example: ['email is required'],
+          },
+        },
+        required: ['success', 'message', 'errorCode'],
+      },
+      User: {
+        type: 'object',
+        properties: {
+          id: { type: 'integer', example: 1 },
+          name: { type: 'string', example: 'Admin User' },
+          email: { type: 'string', example: 'admin@test.com' },
+          role: { type: 'string', enum: ['user', 'admin'], example: 'admin' },
+          created_at: { type: 'string', example: '2026-10-02 04:08:24' },
+          updated_at: { type: 'string', example: '2026-10-02 04:08:24' },
+        },
+      },
+      Product: {
+        type: 'object',
+        properties: {
+          id: { type: 'integer', example: 1 },
+          name: { type: 'string', example: 'Wireless Bluetooth Headphones' },
+          description: { type: 'string', example: 'Premium noise-cancelling over-ear headphones' },
+          price: { type: 'number', format: 'float', example: 79.99 },
+          stock: { type: 'integer', example: 150 },
+          category: { type: 'string', example: 'Electronics' },
+          imageUrl: { type: 'string', example: '/images/products/p-001.jpg' },
+          image_url: { type: 'string', example: '/images/products/p-001.jpg' },
+          created_at: { type: 'string', example: '2026-10-02 04:08:24' },
+          updated_at: { type: 'string', example: '2026-10-02 04:08:24' },
+        },
+      },
+      CartItem: {
+        type: 'object',
+        properties: {
+          id: { type: 'integer', example: 1 },
+          productId: { type: 'integer', example: 1 },
+          name: { type: 'string', example: 'Wireless Bluetooth Headphones' },
+          price: { type: 'number', example: 79.99 },
+          quantity: { type: 'integer', example: 2 },
+          lineTotal: { type: 'number', example: 159.98 },
+          stock: { type: 'integer', example: 150 },
+          category: { type: 'string', example: 'Electronics' },
+          imageUrl: { type: 'string', example: '/images/products/p-001.jpg' },
+        },
+      },
+      Cart: {
+        type: 'object',
+        properties: {
+          id: { type: 'integer', example: 1 },
+          items: {
+            type: 'array',
+            items: { $ref: '#/components/schemas/CartItem' },
+          },
+          itemCount: { type: 'integer', example: 2 },
+          total: { type: 'number', example: 159.98 },
+        },
+      },
+      OrderItem: {
+        type: 'object',
+        properties: {
+          id: { type: 'integer', example: 1 },
+          order_id: { type: 'integer', example: 1 },
+          product_id: { type: 'integer', example: 1 },
+          product_name: { type: 'string', example: 'Wireless Bluetooth Headphones' },
+          product_price: { type: 'number', example: 79.99 },
+          quantity: { type: 'integer', example: 2 },
+          imageUrl: { type: 'string', example: '/images/products/p-001.jpg' },
+        },
+      },
+      Order: {
+        type: 'object',
+        properties: {
+          id: { type: 'integer', example: 1 },
+          user_id: { type: 'integer', example: 2 },
+          total: { type: 'number', example: 159.98 },
+          status: { type: 'string', enum: ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'], example: 'pending' },
+          created_at: { type: 'string', example: '2026-10-02 04:09:01' },
+          updated_at: { type: 'string', example: '2026-10-02 04:09:01' },
+          items: {
+            type: 'array',
+            items: { $ref: '#/components/schemas/OrderItem' },
+          },
+        },
+      },
+    },
+  },
+  paths: {
+    '/api/health': {
+      get: {
+        summary: 'System health check',
+        description: 'Returns the health status, uptime, and current server timestamp.',
+        tags: ['Utility'],
+        responses: {
+          200: {
+            description: 'API is running normally',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean', example: true },
+                    status: { type: 'string', example: 'ok' },
+                    timestamp: { type: 'string' },
+                    uptime: { type: 'number' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    '/api/auth/register': {
+      post: {
+        summary: 'Register a new user',
+        tags: ['Auth'],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['name', 'email', 'password'],
+                properties: {
+                  name: { type: 'string', example: 'John Doe' },
+                  email: { type: 'string', format: 'email', example: 'john@test.com' },
+                  password: { type: 'string', example: 'Password@123' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: 'User registered successfully',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean', example: true },
+                    message: { type: 'string', example: 'Registration successful' },
+                    user: { $ref: '#/components/schemas/User' },
+                    accessToken: { type: 'string' },
+                    refreshToken: { type: 'string' },
+                    tokenType: { type: 'string', example: 'Bearer' },
+                    expiresIn: { type: 'string', example: '15m' },
+                  },
+                },
+              },
+            },
+          },
+          409: {
+            description: 'Email already registered',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } },
+          },
+          422: {
+            description: 'Validation error (bad format or missing fields)',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } },
+          },
+        },
+      },
+    },
+    '/api/auth/login': {
+      post: {
+        summary: 'Authenticate user and return JWT tokens',
+        tags: ['Auth'],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['email', 'password'],
+                properties: {
+                  email: { type: 'string', example: 'user@test.com' },
+                  password: { type: 'string', example: 'User@123' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'Login successful',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean', example: true },
+                    message: { type: 'string', example: 'Login successful' },
+                    user: { $ref: '#/components/schemas/User' },
+                    accessToken: { type: 'string' },
+                    refreshToken: { type: 'string' },
+                    tokenType: { type: 'string', example: 'Bearer' },
+                    expiresIn: { type: 'string', example: '15m' },
+                  },
+                },
+              },
+            },
+          },
+          401: {
+            description: 'Invalid credentials',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } },
+          },
+          422: {
+            description: 'Validation failed',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } },
+          },
+        },
+      },
+    },
+    '/api/auth/refresh': {
+      post: {
+        summary: 'Refresh access token using refreshToken',
+        tags: ['Auth'],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['refreshToken'],
+                properties: {
+                  refreshToken: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'New token pair generated',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean', example: true },
+                    accessToken: { type: 'string' },
+                    refreshToken: { type: 'string' },
+                    tokenType: { type: 'string', example: 'Bearer' },
+                    expiresIn: { type: 'string', example: '15m' },
+                  },
+                },
+              },
+            },
+          },
+          401: {
+            description: 'Invalid, revoked or expired refresh token',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } },
+          },
+          422: {
+            description: 'Missing refresh token parameter',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } },
+          },
+        },
+      },
+    },
+    '/api/auth/logout': {
+      post: {
+        summary: 'Logout and blacklist JWT tokens',
+        security: [{ bearerAuth: [] }],
+        tags: ['Auth'],
+        requestBody: {
+          required: false,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  refreshToken: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'Logout successful',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean', example: true },
+                    message: { type: 'string', example: 'Logout successful' },
+                  },
+                },
+              },
+            },
+          },
+          401: {
+            description: 'Missing or invalid token',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } },
+          },
+        },
+      },
+    },
+    '/api/auth/me': {
+      get: {
+        summary: 'Get current user profile',
+        security: [{ bearerAuth: [] }],
+        tags: ['Auth'],
+        responses: {
+          200: {
+            description: 'User profile returned',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean', example: true },
+                    user: { $ref: '#/components/schemas/User' },
+                  },
+                },
+              },
+            },
+          },
+          401: {
+            description: 'Missing or expired token',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } },
+          },
+        },
+      },
+    },
+    '/api/users': {
+      get: {
+        summary: 'List all users (Admin only)',
+        security: [{ bearerAuth: [] }],
+        tags: ['Users'],
+        responses: {
+          200: {
+            description: 'List of all users',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean', example: true },
+                    users: {
+                      type: 'array',
+                      items: { $ref: '#/components/schemas/User' },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          401: { description: 'Missing or invalid token' },
+          403: { description: 'Admin access required' },
+        },
+      },
+    },
+    '/api/users/{id}': {
+      get: {
+        summary: 'Get user by ID (Owner or Admin)',
+        security: [{ bearerAuth: [] }],
+        tags: ['Users'],
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'integer' } },
+        ],
+        responses: {
+          200: {
+            description: 'User details',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean', example: true },
+                    user: { $ref: '#/components/schemas/User' },
+                  },
+                },
+              },
+            },
+          },
+          401: { description: 'Missing or invalid token' },
+          403: { description: 'Access denied (not owner or admin)' },
+          404: { description: 'User not found' },
+        },
+      },
+      put: {
+        summary: 'Update user profile (Owner or Admin)',
+        security: [{ bearerAuth: [] }],
+        tags: ['Users'],
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'integer' } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string', example: 'Updated Name' },
+                  email: { type: 'string', format: 'email', example: 'updated@test.com' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'User updated successfully',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean', example: true },
+                    message: { type: 'string', example: 'User updated successfully' },
+                    user: { $ref: '#/components/schemas/User' },
+                  },
+                },
+              },
+            },
+          },
+          401: { description: 'Missing or invalid token' },
+          403: { description: 'Access denied' },
+          404: { description: 'User not found' },
+          409: { description: 'Email already in use' },
+          422: { description: 'Validation failed' },
+        },
+      },
+      delete: {
+        summary: 'Delete user by ID (Admin only, cannot delete self)',
+        security: [{ bearerAuth: [] }],
+        tags: ['Users'],
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'integer' } },
+        ],
+        responses: {
+          204: { description: 'User deleted successfully (no content)' },
+          400: { description: 'Cannot delete own account' },
+          401: { description: 'Missing or invalid token' },
+          403: { description: 'Admin access required' },
+          404: { description: 'User not found' },
+        },
+      },
+    },
+    '/api/products': {
+      get: {
+        summary: 'List products (Public; pagination, search, sort, filter)',
+        tags: ['Products'],
+        parameters: [
+          { name: 'page', in: 'query', schema: { type: 'integer', default: 1 } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', default: 12 } },
+          { name: 'search', in: 'query', schema: { type: 'string' } },
+          { name: 'category', in: 'query', schema: { type: 'string' } },
+          { name: 'minPrice', in: 'query', schema: { type: 'number' } },
+          { name: 'maxPrice', in: 'query', schema: { type: 'number' } },
+          { name: 'sort', in: 'query', schema: { type: 'string', default: 'id' } },
+          { name: 'order', in: 'query', schema: { type: 'string', enum: ['asc', 'desc'], default: 'asc' } },
+        ],
+        responses: {
+          200: {
+            description: 'Paginated list of products',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean', example: true },
+                    products: { type: 'array', items: { $ref: '#/components/schemas/Product' } },
+                    pagination: {
+                      type: 'object',
+                      properties: {
+                        page: { type: 'integer', example: 1 },
+                        limit: { type: 'integer', example: 12 },
+                        total: { type: 'integer', example: 50 },
+                        totalPages: { type: 'integer', example: 5 },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      post: {
+        summary: 'Create a new product (Admin only)',
+        security: [{ bearerAuth: [] }],
+        tags: ['Products'],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['name', 'price', 'category'],
+                properties: {
+                  name: { type: 'string', example: 'Wireless Ergonomic Keyboard' },
+                  description: { type: 'string', example: 'Split mechanical ergonomic keyboard.' },
+                  price: { type: 'number', example: 149.99 },
+                  stock: { type: 'integer', example: 45 },
+                  category: { type: 'string', enum: ['Electronics', 'Clothing', 'Books', 'Home & Kitchen', 'Sports'], example: 'Electronics' },
+                  imageUrl: { type: 'string', description: 'Relative /images/... path or http(s) URL (optional, defaults to /images/placeholder.svg)', example: '/images/products/p-001.jpg' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: 'Product created successfully',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean', example: true },
+                    message: { type: 'string', example: 'Product created successfully' },
+                    product: { $ref: '#/components/schemas/Product' },
+                  },
+                },
+              },
+            },
+          },
+          401: { description: 'Missing or invalid token' },
+          403: { description: 'Admin access required' },
+          422: { description: 'Validation failed' },
+        },
+      },
+    },
+    '/api/products/{id}': {
+      get: {
+        summary: 'Get product by ID (Public)',
+        tags: ['Products'],
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'integer' } },
+        ],
+        responses: {
+          200: {
+            description: 'Product details',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean', example: true },
+                    product: { $ref: '#/components/schemas/Product' },
+                  },
+                },
+              },
+            },
+          },
+          404: { description: 'Product not found' },
+        },
+      },
+      put: {
+        summary: 'Update product by ID (Admin only)',
+        security: [{ bearerAuth: [] }],
+        tags: ['Products'],
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'integer' } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string' },
+                  description: { type: 'string' },
+                  price: { type: 'number' },
+                  stock: { type: 'integer' },
+                  category: { type: 'string' },
+                  imageUrl: { type: 'string', description: 'Relative /images/... path or http(s) URL' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'Product updated successfully',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean', example: true },
+                    message: { type: 'string', example: 'Product updated successfully' },
+                    product: { $ref: '#/components/schemas/Product' },
+                  },
+                },
+              },
+            },
+          },
+          401: { description: 'Missing or invalid token' },
+          403: { description: 'Admin access required' },
+          404: { description: 'Product not found' },
+          422: { description: 'Validation failed' },
+        },
+      },
+      delete: {
+        summary: 'Delete product by ID (Admin only)',
+        security: [{ bearerAuth: [] }],
+        tags: ['Products'],
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'integer' } },
+        ],
+        responses: {
+          204: { description: 'Product deleted successfully (no content)' },
+          401: { description: 'Missing or invalid token' },
+          403: { description: 'Admin access required' },
+          404: { description: 'Product not found' },
+        },
+      },
+    },
+    '/api/cart': {
+      get: {
+        summary: 'Get current user cart',
+        security: [{ bearerAuth: [] }],
+        tags: ['Cart'],
+        responses: {
+          200: {
+            description: 'Cart object with items, line totals, and total amount',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean', example: true },
+                    cart: { $ref: '#/components/schemas/Cart' },
+                  },
+                },
+              },
+            },
+          },
+          401: { description: 'Missing or invalid token' },
+        },
+      },
+    },
+    '/api/cart/items': {
+      post: {
+        summary: 'Add item to current cart',
+        security: [{ bearerAuth: [] }],
+        tags: ['Cart'],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['productId'],
+                properties: {
+                  productId: { type: 'integer', example: 1 },
+                  quantity: { type: 'integer', example: 2, default: 1 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: 'Item added to cart',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean', example: true },
+                    message: { type: 'string', example: 'Item added to cart' },
+                    item: { $ref: '#/components/schemas/CartItem' },
+                  },
+                },
+              },
+            },
+          },
+          400: { description: 'Insufficient stock' },
+          401: { description: 'Missing or invalid token' },
+          404: { description: 'Product not found' },
+          422: { description: 'Validation failed' },
+        },
+      },
+    },
+    '/api/cart/items/{itemId}': {
+      delete: {
+        summary: 'Remove item from cart by itemId',
+        security: [{ bearerAuth: [] }],
+        tags: ['Cart'],
+        parameters: [
+          { name: 'itemId', in: 'path', required: true, schema: { type: 'integer' } },
+        ],
+        responses: {
+          200: {
+            description: 'Item removed from cart',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean', example: true },
+                    message: { type: 'string', example: 'Item removed from cart' },
+                  },
+                },
+              },
+            },
+          },
+          401: { description: 'Missing or invalid token' },
+          404: { description: 'Cart or Cart item not found' },
+        },
+      },
+    },
+    '/api/orders': {
+      post: {
+        summary: 'Create order from current user cart',
+        security: [{ bearerAuth: [] }],
+        tags: ['Orders'],
+        responses: {
+          201: {
+            description: 'Order placed successfully',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean', example: true },
+                    message: { type: 'string', example: 'Order placed successfully' },
+                    order: { $ref: '#/components/schemas/Order' },
+                  },
+                },
+              },
+            },
+          },
+          400: { description: 'Cart is empty or insufficient product stock' },
+          401: { description: 'Missing or invalid token' },
+        },
+      },
+      get: {
+        summary: 'Get orders (Own orders for regular users; all orders for admin)',
+        security: [{ bearerAuth: [] }],
+        tags: ['Orders'],
+        responses: {
+          200: {
+            description: 'List of orders',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean', example: true },
+                    orders: {
+                      type: 'array',
+                      items: { $ref: '#/components/schemas/Order' },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          401: { description: 'Missing or invalid token' },
+        },
+      },
+    },
+    '/api/orders/{id}': {
+      get: {
+        summary: 'Get order details by order ID (Owner or Admin)',
+        security: [{ bearerAuth: [] }],
+        tags: ['Orders'],
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'integer' } },
+        ],
+        responses: {
+          200: {
+            description: 'Order details with line items',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean', example: true },
+                    order: { $ref: '#/components/schemas/Order' },
+                  },
+                },
+              },
+            },
+          },
+          401: { description: 'Missing or invalid token' },
+          403: { description: 'Access denied' },
+          404: { description: 'Order not found' },
+        },
+      },
+    },
+    '/api/orders/{id}/cancel': {
+      patch: {
+        summary: 'Cancel an order (Owner or Admin, only pending or confirmed)',
+        security: [{ bearerAuth: [] }],
+        tags: ['Orders'],
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'integer' } },
+        ],
+        responses: {
+          200: {
+            description: 'Order cancelled and stock restored',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean', example: true },
+                    message: { type: 'string', example: 'Order cancelled successfully' },
+                    order: { $ref: '#/components/schemas/Order' },
+                  },
+                },
+              },
+            },
+          },
+          400: { description: 'Cannot cancel order with current status' },
+          401: { description: 'Missing or invalid token' },
+          403: { description: 'Access denied' },
+          404: { description: 'Order not found' },
+        },
+      },
+    },
+    '/api/admin/reset-db': {
+      post: {
+        summary: 'Reset database to seed data (Admin token required)',
+        security: [{ bearerAuth: [] }],
+        tags: ['Utility'],
+        responses: {
+          200: {
+            description: 'Database reset to seed data',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean', example: true },
+                    message: { type: 'string', example: 'Database reset to seed data successfully' },
+                  },
+                },
+              },
+            },
+          },
+          401: { description: 'Missing or invalid token' },
+          403: { description: 'Admin access required' },
+        },
+      },
+    },
+  },
+};
+
+function setupSwagger(app) {
+  // Save openapi.json to backend and root if not identical
+  try {
+    const jsonStr = JSON.stringify(openapiSpecification, null, 2);
+    const backendPath = path.resolve(__dirname, '../openapi.json');
+    const rootPath = path.resolve(__dirname, '../../openapi.json');
+
+    if (!fs.existsSync(backendPath) || fs.readFileSync(backendPath, 'utf8') !== jsonStr) {
+      fs.writeFileSync(backendPath, jsonStr);
+    }
+    if (!fs.existsSync(rootPath) || fs.readFileSync(rootPath, 'utf8') !== jsonStr) {
+      fs.writeFileSync(rootPath, jsonStr);
+    }
+  } catch (err) {
+    console.warn('Could not export openapi.json to disk:', err.message);
+  }
+
+  // Serve openapi.json directly
+  app.get('/openapi.json', (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.send(openapiSpecification);
+  });
+
+  // Serve Swagger UI at /api-docs
+  app.use(
+    '/api-docs',
+    swaggerUi.serve,
+    swaggerUi.setup(openapiSpecification, {
+      customSiteTitle: 'QA Playground API Documentation',
+      swaggerOptions: {
+        persistAuthorization: true,
+      },
+    })
+  );
+
+  console.log('📖 Swagger UI initialized at /api-docs');
+}
+
+module.exports = setupSwagger;
