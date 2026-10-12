@@ -1,7 +1,10 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 export const NotFoundPage = () => {
+  useDocumentTitle('Page not found');
+
   return (
     <div className="not-found-container" data-testid="not-found-page">
       <div className="not-found-card">

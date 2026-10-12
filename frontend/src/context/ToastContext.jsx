@@ -24,15 +24,16 @@ export const ToastProvider = ({ children }) => {
   return (
     <ToastContext.Provider value={{ showSuccess, showError }}>
       {children}
-      <div className="toast-container" data-testid="toast-container">
+      <div className="toast-container" data-testid="toast-container" aria-live="polite">
         {toasts.map((toast) => (
           <div
             key={toast.id}
             className={`toast toast-${toast.type}`}
             data-testid={toast.type === 'success' ? 'toast-success' : 'toast-error'}
+            role={toast.type === 'error' ? 'alert' : 'status'}
             onClick={() => removeToast(toast.id)}
           >
-            <span className="toast-icon">
+            <span className="toast-icon" aria-hidden="true">
               {toast.type === 'success' ? (
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="20 6 9 17 4 12" />
@@ -46,7 +47,7 @@ export const ToastProvider = ({ children }) => {
               )}
             </span>
             <span className="toast-message">{toast.message}</span>
-            <button className="toast-close" onClick={() => removeToast(toast.id)} aria-label="Close">
+            <button type="button" className="toast-close" onClick={() => removeToast(toast.id)} aria-label="Dismiss notification">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="18" y1="6" x2="6" y2="18" />
                 <line x1="6" y1="6" x2="18" y2="18" />

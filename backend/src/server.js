@@ -120,7 +120,7 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
   console.log(`\n🚀 QA Playground API running on http://localhost:${PORT}`);
   console.log(`📋 Health check: http://localhost:${PORT}/api/health`);
-  console.log(`📖 API docs: http://localhost:${PORT}/api-docs (after Phase 5)\n`);
+  console.log(`📖 API docs: http://localhost:${PORT}/api-docs\n`);
 });
 
 module.exports = app;

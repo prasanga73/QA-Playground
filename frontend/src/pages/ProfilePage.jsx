@@ -3,16 +3,21 @@ import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { formatDate, formatDateTime } from '../utils/format';
 
 export const ProfilePage = () => {
   const { updateProfile, logout } = useAuth();
   const { showSuccess, showError } = useToast();
   const navigate = useNavigate();
+  useDocumentTitle('Profile');
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('');
   const [userId, setUserId] = useState(null);
+  // Last saved server values: drives the dirty check and the account details card
+  const [savedUser, setSavedUser] = useState(null);
 
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -30,6 +35,7 @@ export const ProfilePage = () => {
           setEmail(u.email || '');
           setRole(u.role || 'user');
           setUserId(u.id);
+          setSavedUser(u);
         }
       } catch (err) {
         showError(err.response?.data?.message || 'Failed to load user profile');
@@ -83,6 +89,9 @@ export const ProfilePage = () => {
 
       if (response.data.success && response.data.user) {
         updateProfile(response.data.user);
+        setSavedUser(response.data.user);
+        setName(response.data.user.name || '');
+        setEmail(response.data.user.email || '');
         showSuccess('Profile updated successfully!');
       }
     } catch (err) {
@@ -100,23 +109,35 @@ export const ProfilePage = () => {
     navigate('/login');
   };
 
+  const isDirty = Boolean(savedUser) && (
+    name.trim() !== (savedUser.name || '') ||
+    email.trim().toLowerCase() !== (savedUser.email || '').toLowerCase()
+  );
+
+  const pageHeader = (
+    <header className="page-header">
+      <div>
+        <h1 className="page-title">User Profile</h1>
+        <p className="page-subtitle">View and manage your account credentials and role</p>
+      </div>
+    </header>
+  );
+
   if (loading) {
     return (
-      <div className="state-container" data-testid="profile-loading">
-        <div className="spinner"></div>
-        <p className="state-text">Loading user profile...</p>
+      <div className="page-container">
+        {pageHeader}
+        <div className="state-container" data-testid="profile-loading">
+          <div className="spinner"></div>
+          <p className="state-text">Loading user profile...</p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="page-container" data-testid="profile-page">
-      <header className="page-header">
-        <div>
-          <h1 className="page-title">User Profile</h1>
-          <p className="page-subtitle">View and manage your account credentials and role</p>
-        </div>
-      </header>
+      {pageHeader}
 
       <div className="profile-layout">
         <div className="profile-card" data-testid="profile-card">
@@ -199,11 +220,18 @@ export const ProfilePage = () => {
             <div className="profile-actions-row">
               <button
                 type="submit"
-                disabled={isSaving}
+                disabled={isSaving || !isDirty}
                 className="btn btn-primary btn-lg"
                 data-testid="profile-save"
+                title={!isDirty && !isSaving ? 'No changes to save' : undefined}
               >
-                Save Changes
+                {isSaving ? (
+                  <span className="btn-loading">
+                    <span className="spinner-sm"></span> Saving...
+                  </span>
+                ) : (
+                  'Save Changes'
+                )}
               </button>
 
               <button
@@ -217,6 +245,30 @@ export const ProfilePage = () => {
             </div>
           </form>
         </div>
+
+        {savedUser && (
+          <aside className="profile-card account-details-card" data-testid="account-details">
+            <h2 className="account-details-title">Account details</h2>
+            <dl className="account-details-list">
+              <div className="account-details-row">
+                <dt>User ID</dt>
+                <dd data-testid="account-user-id">#{savedUser.id}</dd>
+              </div>
+              <div className="account-details-row">
+                <dt>Role</dt>
+                <dd>{role === 'admin' ? 'Administrator' : 'Standard user'}</dd>
+              </div>
+              <div className="account-details-row">
+                <dt>Member since</dt>
+                <dd data-testid="account-created-at">{formatDate(savedUser.created_at)}</dd>
+              </div>
+              <div className="account-details-row">
+                <dt>Last updated</dt>
+                <dd data-testid="account-updated-at">{formatDateTime(savedUser.updated_at)}</dd>
+              </div>
+            </dl>
+          </aside>
+        )}
       </div>
     </div>
   );

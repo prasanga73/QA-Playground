@@ -4,11 +4,21 @@ import api from '../api/axios';
 import { useCart } from '../context/CartContext';
 import { useToast } from '../context/ToastContext';
 import ProductImage from '../components/ProductImage';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
+
+// Recompute derived totals after the item list changes
+const withItems = (cart, items) => ({
+  ...cart,
+  items,
+  total: Math.round(items.reduce((sum, item) => sum + item.lineTotal, 0) * 100) / 100,
+  itemCount: items.length,
+});
 
 export const CartPage = () => {
   const { refreshCart, setCartCount, setCartItems } = useCart();
   const { showSuccess, showError } = useToast();
   const navigate = useNavigate();
+  useDocumentTitle('Cart');
 
   const [cart, setCart] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -24,16 +34,22 @@ export const CartPage = () => {
       const response = await api.get('/cart');
       if (response.data.success) {
         setCart(response.data.cart);
-        const items = response.data.cart?.items || [];
-        setCartItems(items);
-        setCartCount(items.reduce((s, i) => s + i.quantity, 0));
       }
     } catch (err) {
       showError(err.response?.data?.message || 'Failed to load shopping cart');
     } finally {
       if (isInitial) setLoading(false);
     }
-  }, [showError, setCartItems, setCartCount]);
+  }, [showError]);
+
+  // Mirror the local cart into CartContext (navbar badge, product stock) after each change.
+  // Doing this inside setCart updaters would update another component mid-render.
+  useEffect(() => {
+    if (!cart) return;
+    const items = cart.items || [];
+    setCartItems(items);
+    setCartCount(items.reduce((sum, item) => sum + item.quantity, 0));
+  }, [cart, setCartItems, setCartCount]);
 
   useEffect(() => {
     fetchCart(true);
@@ -56,7 +72,7 @@ export const CartPage = () => {
       return;
     }
 
-    // Immediately update local cart and context (badge) without any text changes or button disables
+    // Immediately update the local cart (the effect above syncs the navbar badge)
     setCart((prevCart) => {
       if (!prevCart) return prevCart;
       const updatedItems = (prevCart.items || []).map((item) => {
@@ -66,18 +82,7 @@ export const CartPage = () => {
         }
         return item;
       });
-      const newTotal = updatedItems.reduce((sum, item) => sum + item.lineTotal, 0);
-      const newCount = updatedItems.reduce((sum, item) => sum + item.quantity, 0);
-
-      setCartCount(newCount);
-      setCartItems(updatedItems);
-
-      return {
-        ...prevCart,
-        items: updatedItems,
-        total: Math.round(newTotal * 100) / 100,
-        itemCount: updatedItems.length,
-      };
+      return withItems(prevCart, updatedItems);
     });
 
     // Debounce the backend sync by 250ms so rapid clicks (+ + +) are butter smooth
@@ -111,19 +116,7 @@ export const CartPage = () => {
     // Optimistically remove item from UI immediately
     setCart((prevCart) => {
       if (!prevCart) return prevCart;
-      const updatedItems = (prevCart.items || []).filter((item) => item.id !== itemId);
-      const newTotal = updatedItems.reduce((sum, item) => sum + item.lineTotal, 0);
-      const newCount = updatedItems.reduce((s, i) => s + i.quantity, 0);
-
-      setCartCount(newCount);
-      setCartItems(updatedItems);
-
-      return {
-        ...prevCart,
-        items: updatedItems,
-        total: Math.round(newTotal * 100) / 100,
-        itemCount: updatedItems.length,
-      };
+      return withItems(prevCart, (prevCart.items || []).filter((item) => item.id !== itemId));
     });
 
     try {
@@ -263,10 +256,10 @@ export const CartPage = () => {
                             </div>
                           </div>
                         </td>
-                        <td data-testid={`cart-item-price-${item.id}`}>
+                        <td data-label="Price" data-testid={`cart-item-price-${item.id}`}>
                           ${Number(item.price).toFixed(2)}
                         </td>
-                        <td className="text-center">
+                        <td className="text-center" data-label="Quantity">
                           <div className="cart-qty-stepper" data-testid={`cart-qty-stepper-${item.id}`}>
                             <button
                               type="button"
@@ -281,7 +274,7 @@ export const CartPage = () => {
                               </svg>
                             </button>
 
-                            <span className="cart-qty-badge" data-testid={`cart-item-qty-${item.id}`}>
+                            <span className="cart-qty-badge" data-testid={`cart-item-qty-${item.id}`} aria-live="polite">
                               {item.quantity}
                             </span>
 
@@ -301,10 +294,10 @@ export const CartPage = () => {
                             </button>
                           </div>
                         </td>
-                        <td className="font-semibold" data-testid={`cart-item-total-${item.id}`}>
+                        <td className="font-semibold" data-label="Total" data-testid={`cart-item-total-${item.id}`}>
                           ${Number(item.lineTotal).toFixed(2)}
                         </td>
-                        <td className="text-center">
+                        <td className="text-center cart-action-cell">
                           <button
                             type="button"
                             onClick={() => handleRemoveItem(item.id, item.name)}

@@ -452,6 +452,170 @@ const openapiSpecification = {
   },
 };
 
+// Same bolt mark as the frontend favicon, so the docs tab is recognizable
+const docsFavicon = 'data:image/svg+xml,' + encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#0F766E"/>' +
+  '<path d="M17.5 5 8 18h7l-1 9 10-13h-7l.5-9z" fill="#fff"/></svg>'
+);
+
+// "Sign in as" reuses the markup and classes of Swagger's own "Servers" picker, so it looks
+// native in light and dark mode and keeps a fixed width whatever the auth state.
+const docsCss = `
+  .swagger-ui .topbar { display: none; }
+  html.dark-mode body { background: #1c2022; }
+
+  .swagger-ui .scheme-container .schemes .auth-wrapper { align-items: flex-end; gap: 20px; }
+  .swagger-ui .qa-auth .servers > label { margin-right: 0; }
+  .swagger-ui .qa-auth select { min-width: 230px; }
+  .swagger-ui .qa-auth select:disabled { opacity: 0.6; cursor: wait; }
+
+  /* Hide the static response docs once a live response is shown, to keep results readable */
+  .responses-inner .live-responses-table ~ h4,
+  .responses-inner .live-responses-table ~ table.responses-table {
+    display: none !important;
+  }
+`;
+
+/**
+ * Runs in the browser on /api-docs (inlined via Function#toString).
+ * - Applies the app's light/dark theme, passed in as ?theme= by the frontend Docs link.
+ * - Adds a "Sign in as" picker beside Swagger's Authorize button that fetches a JWT for a
+ *   seeded account, and stays in sync with Swagger's own auth state (Authorize dialog,
+ *   persisted auth).
+ * Note: swagger-ui-express inlines this with String#replace, so avoid "$" followed by
+ * an apostrophe, backtick or ampersand anywhere in this function.
+ */
+function docsClientScript() {
+  const THEME_KEY = 'qa-docs-theme';
+  const SCHEME_NAME = 'bearerAuth';
+  const PRESETS = {
+    admin: { email: 'admin@test.com', password: 'Admin@123' },
+    user: { email: 'user@test.com', password: 'User@123' },
+  };
+
+  let theme = null;
+  try {
+    const requested = new URLSearchParams(window.location.search).get('theme');
+    if (requested === 'dark' || requested === 'light') {
+      theme = requested;
+      localStorage.setItem(THEME_KEY, theme);
+    } else {
+      theme = localStorage.getItem(THEME_KEY);
+    }
+  } catch (e) {
+    // Storage unavailable: fall back to Swagger's OS-preference default
+  }
+
+  // Swagger's (hidden) dark-mode toggle applies the OS preference on mount, so this runs again later
+  const applyTheme = () => {
+    if (theme) document.documentElement.classList.toggle('dark-mode', theme === 'dark');
+  };
+  applyTheme();
+
+  const decodeJwt = (token) => {
+    try {
+      const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+      return JSON.parse(atob(base64));
+    } catch (e) {
+      return null;
+    }
+  };
+
+  const init = (ui) => {
+    const group = document.createElement('div');
+    group.id = 'qa-quick-auth';
+    group.className = 'qa-auth';
+    group.innerHTML = `
+      <span class="servers-title">Sign in as</span>
+      <div class="servers">
+        <label for="qa-auth-select">
+          <select id="qa-auth-select">
+            <option value="">Not signed in</option>
+            <option value="admin">Admin (admin@test.com)</option>
+            <option value="user">User (user@test.com)</option>
+            <option value="custom" disabled hidden>Custom token</option>
+          </select>
+        </label>
+      </div>`;
+    const select = group.querySelector('select');
+
+    const currentToken = () => {
+      try {
+        const auth = ui.authSelectors.authorized().toJS();
+        return (auth[SCHEME_NAME] && auth[SCHEME_NAME].value) || null;
+      } catch (e) {
+        return null;
+      }
+    };
+
+    // Reflect Swagger's auth state, whichever way it was set
+    const render = () => {
+      if (select.disabled) return; // sign-in in flight; keep the user's choice showing
+      const token = currentToken();
+      const claims = token ? decodeJwt(token) || {} : null;
+      const preset = claims && Object.keys(PRESETS).find((key) => PRESETS[key].email === claims.email);
+      select.value = token ? preset || 'custom' : '';
+      const expiresAt = claims && claims.exp ? new Date(claims.exp * 1000) : null;
+      select.title = expiresAt
+        ? `Token expires at ${expiresAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+        : 'Fetch a token for a seeded test account';
+    };
+
+    select.addEventListener('change', async () => {
+      select.classList.remove('invalid');
+      const preset = PRESETS[select.value];
+      if (!preset) {
+        ui.authActions.logoutWithPersistOption([SCHEME_NAME]);
+        return;
+      }
+      select.disabled = true;
+      try {
+        const response = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(preset),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.accessToken) throw new Error(data.message || `HTTP ${response.status}`);
+        ui.authActions.authorizeWithPersistOption({
+          [SCHEME_NAME]: { name: SCHEME_NAME, schema: { type: 'http', scheme: 'bearer' }, value: data.accessToken },
+        });
+      } catch (err) {
+        // Swagger's own invalid-field style (red border + shake)
+        select.classList.add('invalid');
+        console.warn('Quick sign-in failed:', err.message);
+      } finally {
+        select.disabled = false;
+        render();
+      }
+    });
+
+    // Swagger may re-render its layout; put the picker back whenever it gets detached
+    const mount = () => {
+      if (group.isConnected) return;
+      const authWrapper = document.querySelector('.swagger-ui .scheme-container .auth-wrapper');
+      if (authWrapper) authWrapper.prepend(group);
+    };
+    mount();
+    new MutationObserver(mount).observe(document.getElementById('swagger-ui'), { childList: true, subtree: true });
+
+    render();
+    ui.getStore().subscribe(render);
+  };
+
+  const started = Date.now();
+  const waitForUi = setInterval(() => {
+    const ready = window.ui && document.querySelector('.swagger-ui .information-container');
+    if (ready) {
+      clearInterval(waitForUi);
+      applyTheme();
+      init(window.ui);
+    } else if (Date.now() - started > 15000) {
+      clearInterval(waitForUi);
+    }
+  }, 100);
+}
+
 function setupSwagger(app) {
   // Export openapi.json
   try {
@@ -473,171 +637,15 @@ function setupSwagger(app) {
     res.send(openapiSpecification);
   });
 
-  const customCss = `
-    .swagger-ui .topbar { display: none; }
-    .qa-auth-banner {
-      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-      border: 1px solid #3b82f6;
-      border-radius: 12px;
-      padding: 20px 24px;
-      margin: 20px auto 24px auto;
-      max-width: 1460px;
-      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 0 15px rgba(59, 130, 246, 0.2);
-      color: #f8fafc;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    }
-    .qa-auth-banner h3 { margin: 0 0 10px 0; color: #38bdf8; font-size: 1.25rem; font-weight: 700; }
-    .qa-auth-presets { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 16px; }
-    .qa-preset-btn {
-      background: #1e293b; color: #e2e8f0; border: 1px solid #475569;
-      padding: 7px 14px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.875rem;
-      transition: all 0.2s ease;
-    }
-    .qa-preset-btn:hover { background: #0284c7; color: #fff; border-color: #38bdf8; transform: translateY(-1px); }
-    .qa-auth-form { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; }
-    .qa-field { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 220px; }
-    .qa-field label { font-size: 0.8rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; }
-    .qa-field input {
-      background: #090d16; border: 1px solid #475569; border-radius: 6px;
-      padding: 10px 14px; color: #f8fafc; font-size: 0.95rem; outline: none; transition: border-color 0.2s;
-    }
-    .qa-field input:focus { border-color: #38bdf8; box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2); }
-    .qa-submit-btn {
-      background: #2563eb; color: white; border: none; padding: 10px 22px; border-radius: 6px;
-      font-weight: 700; font-size: 0.95rem; cursor: pointer; transition: all 0.2s; height: 42px; white-space: nowrap;
-    }
-    .qa-submit-btn:hover { background: #1d4ed8; transform: translateY(-1px); }
-    .qa-token-box { margin-top: 16px; background: #090d16; border: 1px solid #334155; border-radius: 8px; padding: 14px; }
-    .qa-token-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 0.875rem; }
-    .qa-token-input {
-      width: 100%; background: #1e293b; border: 1px solid #475569; color: #38bdf8;
-      font-family: monospace; font-size: 0.82rem; padding: 8px 12px; border-radius: 4px; box-sizing: border-box;
-    }
-    .qa-copy-btn {
-      background: #10b981; color: white; border: none; padding: 5px 14px; border-radius: 4px;
-      cursor: pointer; font-weight: 600; font-size: 0.82rem;
-    }
-    .qa-copy-btn:hover { background: #059669; }
-    /* Response Section Polish: Hide redundant static documentation table when live server response is displayed */
-    .responses-inner .live-responses-table ~ h4,
-    .responses-inner .live-responses-table ~ table.responses-table {
-      display: none !important;
-    }
-  `;
-
-  const customJsStr = `
-    function injectQuickAuth() {
-      var wrapper = document.querySelector("#swagger-ui");
-      if (!wrapper || document.getElementById("qa-quick-auth")) return;
-      var banner = document.createElement("div");
-      banner.id = "qa-quick-auth";
-      banner.className = "qa-auth-banner";
-      banner.innerHTML =
-        "<h3>⚡ Quick JWT Authentication</h3>" +
-        "<div class='qa-auth-presets'>" +
-          "<span style='color:#cbd5e1; font-size:0.875rem; font-weight:600;'>Quick Fill:</span>" +
-          "<button type='button' class='qa-preset-btn' id='qa-btn-admin'>👑 Admin (admin@test.com / Admin@123)</button>" +
-          "<button type='button' class='qa-preset-btn' id='qa-btn-user'>👤 User (user@test.com / User@123)</button>" +
-        "</div>" +
-        "<form class='qa-auth-form' id='qa-login-form'>" +
-          "<div class='qa-field'><label>Email</label>" +
-            "<input type='text' id='qa-input-user' value='admin@test.com' placeholder='admin@test.com' required />" +
-          "</div>" +
-          "<div class='qa-field'><label>Password</label>" +
-            "<input type='password' id='qa-input-pass' value='Admin@123' placeholder='Password' required />" +
-          "</div>" +
-          "<button type='submit' class='qa-submit-btn' id='qa-btn-submit'>🔑 Get Token & Authorize</button>" +
-        "</form>" +
-        "<div id='qa-token-container' class='qa-token-box' style='display:none;'>" +
-          "<div class='qa-token-header'>" +
-            "<span id='qa-token-status' style='color:#34d399; font-weight:600;'></span>" +
-            "<button type='button' class='qa-copy-btn' id='qa-btn-copy'>📋 Copy</button>" +
-          "</div>" +
-          "<input type='text' readonly id='qa-token-val' class='qa-token-input' />" +
-        "</div>";
-      wrapper.insertBefore(banner, wrapper.firstChild);
-
-      function doLogin(email, password) {
-        var statusEl = document.getElementById("qa-token-status");
-        var tokenBox = document.getElementById("qa-token-container");
-        var tokenInput = document.getElementById("qa-token-val");
-        var submitBtn = document.getElementById("qa-btn-submit");
-        submitBtn.textContent = "Authenticating...";
-        submitBtn.disabled = true;
-        fetch("/api/auth/login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: email, password: password })
-        })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-          submitBtn.textContent = "🔑 Get Token & Authorize";
-          submitBtn.disabled = false;
-          var token = data.accessToken || data.token;
-          if (token) {
-            tokenBox.style.display = "block";
-            tokenInput.value = token;
-            var role = (data.user && data.user.role) ? data.user.role.toUpperCase() : "USER";
-            statusEl.textContent = "✅ Authorized as " + role + " — all requests now include Bearer token";
-            statusEl.style.color = "#34d399";
-            if (window.ui) {
-              try {
-                window.ui.authActions.authorize({
-                  bearerAuth: { name: "bearerAuth", schema: { type: "http", scheme: "bearer" }, value: token }
-                });
-              } catch(e) {}
-            }
-          } else {
-            tokenBox.style.display = "block";
-            statusEl.textContent = "❌ " + (data.message || "Login failed");
-            statusEl.style.color = "#f87171";
-            tokenInput.value = JSON.stringify(data);
-          }
-        })
-        .catch(function(err) {
-          submitBtn.textContent = "🔑 Get Token & Authorize";
-          submitBtn.disabled = false;
-          tokenBox.style.display = "block";
-          statusEl.textContent = "❌ " + err.message;
-          statusEl.style.color = "#f87171";
-        });
-      }
-      document.getElementById("qa-btn-admin").addEventListener("click", function() {
-        document.getElementById("qa-input-user").value = "admin@test.com";
-        document.getElementById("qa-input-pass").value = "Admin@123";
-        doLogin("admin@test.com", "Admin@123");
-      });
-      document.getElementById("qa-btn-user").addEventListener("click", function() {
-        document.getElementById("qa-input-user").value = "user@test.com";
-        document.getElementById("qa-input-pass").value = "User@123";
-        doLogin("user@test.com", "User@123");
-      });
-      document.getElementById("qa-login-form").addEventListener("submit", function(e) {
-        e.preventDefault();
-        doLogin(document.getElementById("qa-input-user").value.trim(), document.getElementById("qa-input-pass").value);
-      });
-      document.getElementById("qa-btn-copy").addEventListener("click", function() {
-        var val = document.getElementById("qa-token-val");
-        val.select();
-        navigator.clipboard.writeText(val.value).then(function() {
-          var btn = document.getElementById("qa-btn-copy");
-          btn.textContent = "✅ Copied!";
-          setTimeout(function() { btn.textContent = "📋 Copy"; }, 2000);
-        });
-      });
-    }
-    var authPoll = setInterval(function() {
-      if (document.querySelector("#swagger-ui") && window.ui) { clearInterval(authPoll); injectQuickAuth(); }
-    }, 150);
-  `;
-
   app.use(
     '/api-docs',
     swaggerUi.serve,
     swaggerUi.setup(openapiSpecification, {
       customSiteTitle: 'QA Playground API Docs',
-      customCss: customCss,
-      customJsStr: customJsStr,
+      customfavIcon: docsFavicon,
+      customCss: docsCss,
+      // Serialized into an inline <script>; must stay self-contained (no Node scope)
+      customJsStr: `(${docsClientScript.toString()})();`,
       swaggerOptions: {
         persistAuthorization: true,
         docExpansion: 'list',

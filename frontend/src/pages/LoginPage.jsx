@@ -1,14 +1,24 @@
 import React, { useState } from 'react';
-import { useNavigate, Navigate } from 'react-router-dom';
+import { useNavigate, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useTheme } from '../context/ThemeContext';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
+
+// ProtectedRoute passes the page the user originally asked for; send them back there after sign-in
+const getRedirectPath = (from) => {
+  if (!from?.pathname || from.pathname === '/login') return '/products';
+  return `${from.pathname}${from.search || ''}${from.hash || ''}`;
+};
 
 export const LoginPage = () => {
   const { isAuthenticated, login } = useAuth();
   const { showSuccess } = useToast();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
+  const redirectTo = getRedirectPath(location.state?.from);
+  useDocumentTitle('Sign in');
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -17,9 +27,9 @@ export const LoginPage = () => {
   const [apiError, setApiError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // If already logged in, redirect to /products
+  // If already logged in, skip the form
   if (isAuthenticated) {
-    return <Navigate to="/products" replace />;
+    return <Navigate to={redirectTo} replace />;
   }
 
   const validate = () => {
@@ -53,7 +63,7 @@ export const LoginPage = () => {
     try {
       await login(email.trim(), password);
       showSuccess('Welcome back! Login successful.');
-      navigate('/products', { replace: true });
+      navigate(redirectTo, { replace: true });
     } catch (err) {
       const message = err.response?.data?.message || 'Login failed. Please check your credentials.';
       setApiError(message);

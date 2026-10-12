@@ -1,11 +1,14 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api/axios';
 import { useToast } from '../context/ToastContext';
 import ProductImage from '../components/ProductImage';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { formatDateTime } from '../utils/format';
 
 export const OrdersPage = () => {
   const { showSuccess, showError } = useToast();
+  useDocumentTitle('Orders');
 
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -18,6 +21,13 @@ export const OrdersPage = () => {
   // Modal confirm cancel state
   const [orderToCancel, setOrderToCancel] = useState(null);
   const [cancelling, setCancelling] = useState(false);
+  const cancelTriggerRef = useRef(null);
+  const dismissBtnRef = useRef(null);
+  const cancellingRef = useRef(false);
+
+  useEffect(() => {
+    cancellingRef.current = cancelling;
+  }, [cancelling]);
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
@@ -67,12 +77,32 @@ export const OrdersPage = () => {
 
   const handleOpenCancelDialog = (e, order) => {
     e.stopPropagation();
+    cancelTriggerRef.current = e.currentTarget;
     setOrderToCancel(order);
   };
 
   const handleCloseCancelDialog = () => {
+    if (cancellingRef.current) return;
     setOrderToCancel(null);
   };
+
+  // Dialog behaviour: focus the safe action, close on Escape, lock page scroll, restore focus
+  useEffect(() => {
+    if (!orderToCancel) return undefined;
+    const trigger = cancelTriggerRef.current;
+    dismissBtnRef.current?.focus();
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape' && !cancellingRef.current) setOrderToCancel(null);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = previousOverflow;
+      if (trigger?.isConnected) trigger.focus();
+    };
+  }, [orderToCancel]);
 
   const handleConfirmCancel = async () => {
     if (!orderToCancel) return;
@@ -118,22 +148,6 @@ export const OrdersPage = () => {
 
   const isCancellable = (status) => {
     return status === 'pending' || status === 'confirmed';
-  };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return '—';
-    try {
-      const d = new Date(dateString);
-      return d.toLocaleDateString(undefined, {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    } catch {
-      return dateString;
-    }
   };
 
   return (
@@ -197,7 +211,7 @@ export const OrdersPage = () => {
                           #{order.id}
                         </td>
                         <td data-testid={`order-date-${order.id}`}>
-                          {formatDate(order.created_at)}
+                          {formatDateTime(order.created_at)}
                         </td>
                         <td data-testid={`order-items-count-${order.id}`}>
                           {order.itemCount ?? details?.items?.length ?? '—'} items
@@ -228,11 +242,16 @@ export const OrdersPage = () => {
                             <button
                               type="button"
                               onClick={() => toggleOrderDetails(order.id)}
-                              className="btn btn-ghost btn-sm"
+                              className="btn btn-ghost btn-sm details-toggle-btn"
                               data-testid={`expand-order-${order.id}`}
-                              aria-label="Expand order details"
+                              aria-label={`${isExpanded ? 'Hide' : 'Show'} details for order #${order.id}`}
+                              aria-expanded={isExpanded}
+                              aria-controls={`order-details-panel-${order.id}`}
                             >
                               {isExpanded ? 'Hide' : 'Details'}
+                              <svg className={`chevron-icon ${isExpanded ? 'is-open' : ''}`} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                <polyline points="6 9 12 15 18 9" />
+                              </svg>
                             </button>
                           </div>
                         </td>
@@ -240,7 +259,7 @@ export const OrdersPage = () => {
 
                       {/* Expandable Order Details Row */}
                       {isExpanded && (
-                        <tr className="details-expanded-row" data-testid={`order-details-${order.id}`}>
+                        <tr className="details-expanded-row" id={`order-details-panel-${order.id}`} data-testid={`order-details-${order.id}`}>
                           <td colSpan="6" className="details-expanded-cell">
                             <div className="inline-order-details">
                               <h3 className="details-heading">
@@ -285,6 +304,12 @@ export const OrdersPage = () => {
                                         </tr>
                                       ))}
                                     </tbody>
+                                    <tfoot>
+                                      <tr>
+                                        <td colSpan="3" className="text-right">Order total</td>
+                                        <td className="font-semibold">${Number(details.total ?? order.total).toFixed(2)}</td>
+                                      </tr>
+                                    </tfoot>
                                   </table>
                                 </div>
                               ) : (
@@ -312,7 +337,7 @@ export const OrdersPage = () => {
               >
                 Previous
               </button>
-              <span aria-live="polite">
+              <span className="pagination-status" aria-live="polite">
                 Page {pagination.page} of {pagination.totalPages} ({pagination.total} orders)
               </span>
               <button
@@ -331,10 +356,22 @@ export const OrdersPage = () => {
 
       {/* Confirmation Dialog for Cancellation */}
       {orderToCancel && (
-        <div className="modal-backdrop" data-testid="confirm-cancel-modal">
-          <div className="modal-card">
+        <div
+          className="modal-backdrop"
+          data-testid="confirm-cancel-modal"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) handleCloseCancelDialog();
+          }}
+        >
+          <div
+            className="modal-card"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="cancel-modal-title"
+            aria-describedby="cancel-modal-desc"
+          >
             <div className="modal-header">
-              <h3 className="modal-title">Confirm Order Cancellation</h3>
+              <h3 className="modal-title" id="cancel-modal-title">Confirm Order Cancellation</h3>
               <button
                 type="button"
                 className="modal-close"
@@ -348,7 +385,7 @@ export const OrdersPage = () => {
                 </svg>
               </button>
             </div>
-            <div className="modal-body">
+            <div className="modal-body" id="cancel-modal-desc">
               <p>
                 Are you sure you want to cancel <strong>Order #{orderToCancel.id}</strong> (Total: $
                 {Number(orderToCancel.total).toFixed(2)})?
@@ -363,6 +400,7 @@ export const OrdersPage = () => {
                 className="btn btn-outline-secondary"
                 onClick={handleCloseCancelDialog}
                 disabled={cancelling}
+                ref={dismissBtnRef}
               >
                 Nevermind
               </button>

@@ -1,77 +1,106 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import api from '../api/axios';
 import { useCart } from '../context/CartContext';
 import { useToast } from '../context/ToastContext';
 import ProductImage from '../components/ProductImage';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
+
+const PAGE_SIZE = 12;
+const categories = ['Electronics', 'Clothing', 'Books', 'Home & Kitchen', 'Sports'];
+
+// Filters live in the URL (?search=&category=&minPrice=&maxPrice=&sort=&order=&page=)
+// so a filtered view survives reloads, works with Back/Forward, and can be shared.
+const DEFAULT_PARAMS = { sort: 'id', order: 'asc', page: '1' };
+
+// Text filters keep a local draft so typing stays responsive (URL updates are applied in a
+// transition, which would otherwise drop fast keystrokes), then commit to the URL after a pause.
+const useUrlDraft = (urlValue, commit, delay = 300) => {
+  const [draft, setDraft] = useState(urlValue);
+  const [seenUrlValue, setSeenUrlValue] = useState(urlValue);
+  // Adopt URL changes made elsewhere (Back/Forward, reset, shared links)
+  if (seenUrlValue !== urlValue) {
+    setSeenUrlValue(urlValue);
+    setDraft(urlValue);
+  }
+  useEffect(() => {
+    if (draft === urlValue) return undefined;
+    const timer = setTimeout(() => commit(draft), delay);
+    return () => clearTimeout(timer);
+  }, [draft, urlValue, commit, delay]);
+  return [draft, setDraft];
+};
+
+const clampQuantity = (value, max) => {
+  const parsed = parseInt(value, 10);
+  if (Number.isNaN(parsed) || parsed < 1) return 1;
+  return Math.min(parsed, Math.max(1, max));
+};
 
 export const ProductsPage = () => {
   const { refreshCart, getCartQuantity, setCartCount, setCartItems } = useCart();
   const { showSuccess, showError } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
+  useDocumentTitle('Products');
+
+  const debouncedSearch = searchParams.get('search') || '';
+  const category = searchParams.get('category') || '';
+  const minPrice = searchParams.get('minPrice') || '';
+  const maxPrice = searchParams.get('maxPrice') || '';
+  const sort = searchParams.get('sort') || DEFAULT_PARAMS.sort;
+  const order = searchParams.get('order') || DEFAULT_PARAMS.order;
+  const currentPage = Math.max(1, parseInt(searchParams.get('page'), 10) || 1);
 
   const [products, setProducts] = useState([]);
   const [initialLoading, setInitialLoading] = useState(true);
   const [isFetching, setIsFetching] = useState(false);
-  const [pagination, setPagination] = useState({ page: 1, limit: 12, total: 0, totalPages: 1 });
+  const [pagination, setPagination] = useState({ page: 1, limit: PAGE_SIZE, total: 0, totalPages: 1 });
 
-  // Filters & Sorting state
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [category, setCategory] = useState('');
-  const [minPrice, setMinPrice] = useState('');
-  const [maxPrice, setMaxPrice] = useState('');
-  const [sort, setSort] = useState('id');
-  const [order, setOrder] = useState('asc');
-  const [currentPage, setCurrentPage] = useState(1);
-
-  // Per-product quantities for adding to cart
+  // Per-product quantity drafts (raw input text while editing)
   const [quantities, setQuantities] = useState({});
 
-  const categories = ['Electronics', 'Clothing', 'Books', 'Home & Kitchen', 'Sports'];
+  // Empty values and defaults are dropped to keep URLs short. Filter changes go back to page 1.
+  // Builds from the live URL so back-to-back commits (e.g. two debounced inputs) don't overwrite each other.
+  const updateParams = useCallback((updates, { resetPage = true, replace = true } = {}) => {
+    setSearchParams(() => {
+      const next = new URLSearchParams(window.location.search);
+      Object.entries(updates).forEach(([key, value]) => {
+        const str = value === null || value === undefined ? '' : String(value);
+        if (str === '' || DEFAULT_PARAMS[key] === str) next.delete(key);
+        else next.set(key, str);
+      });
+      if (resetPage && !('page' in updates)) next.delete('page');
+      return next;
+    }, { replace });
+  }, [setSearchParams]);
 
-  // Debounce search input (300ms)
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(search);
-      setCurrentPage(1);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [search]);
+  const commitSearch = useCallback((value) => updateParams({ search: value }), [updateParams]);
+  const commitMinPrice = useCallback((value) => updateParams({ minPrice: value }), [updateParams]);
+  const commitMaxPrice = useCallback((value) => updateParams({ maxPrice: value }), [updateParams]);
+  const [search, setSearch] = useUrlDraft(debouncedSearch, commitSearch);
+  const [minPriceDraft, setMinPriceDraft] = useUrlDraft(minPrice, commitMinPrice);
+  const [maxPriceDraft, setMaxPriceDraft] = useUrlDraft(maxPrice, commitMaxPrice);
 
-  // Handle filter changes resetting page
-  const handleCategoryChange = (val) => {
-    setCategory(val);
-    setCurrentPage(1);
-  };
-
-  const handleMinPriceChange = (val) => {
-    setMinPrice(val);
-    setCurrentPage(1);
-  };
-
-  const handleMaxPriceChange = (val) => {
-    setMaxPrice(val);
-    setCurrentPage(1);
-  };
+  const priceRangeInvalid = minPriceDraft !== '' && maxPriceDraft !== '' && Number(minPriceDraft) > Number(maxPriceDraft);
 
   const handleSortChange = (val) => {
     const [newSort, newOrder] = val.split('-');
-    setSort(newSort);
-    setOrder(newOrder);
-    setCurrentPage(1);
+    updateParams({ sort: newSort, order: newOrder });
   };
 
   // Fetch products with AbortController to cancel stale requests
   useEffect(() => {
     const controller = new AbortController();
     let isSubscribed = true;
+    let redirected = false;
 
     const runFetch = async () => {
       setIsFetching(true);
       try {
         const params = {
           page: currentPage,
-          limit: 12,
+          limit: PAGE_SIZE,
           sort,
           order,
         };
@@ -86,8 +115,15 @@ export const ProductsPage = () => {
         });
 
         if (isSubscribed && response.data.success) {
+          const nextPagination = response.data.pagination || { page: 1, limit: PAGE_SIZE, total: 0, totalPages: 1 };
+          // A stale ?page= beyond the last page (e.g. from a shared link): jump to the last page
+          if (nextPagination.total > 0 && currentPage > nextPagination.totalPages) {
+            redirected = true;
+            updateParams({ page: nextPagination.totalPages }, { resetPage: false });
+            return;
+          }
           setProducts(response.data.products || []);
-          setPagination(response.data.pagination || { page: 1, limit: 12, total: 0, totalPages: 1 });
+          setPagination(nextPagination);
         }
       } catch (err) {
         if (axios.isCancel(err) || err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
@@ -98,7 +134,7 @@ export const ProductsPage = () => {
           showError(err.response?.data?.message || 'Failed to fetch products');
         }
       } finally {
-        if (isSubscribed) {
+        if (isSubscribed && !redirected) {
           setIsFetching(false);
           setInitialLoading(false);
         }
@@ -111,31 +147,26 @@ export const ProductsPage = () => {
       isSubscribed = false;
       controller.abort();
     };
-  }, [debouncedSearch, category, minPrice, maxPrice, sort, order, currentPage, showError]);
+  }, [debouncedSearch, category, minPrice, maxPrice, sort, order, currentPage, showError, updateParams]);
 
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= pagination.totalPages) {
-      setCurrentPage(newPage);
+      // Page changes get their own history entry so Back returns to the previous page
+      updateParams({ page: newPage }, { resetPage: false, replace: false });
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
-  };
-
-  const handleQuantityChange = (productId, val) => {
-    const parsed = parseInt(val, 10);
-    setQuantities((prev) => ({
-      ...prev,
-      [productId]: isNaN(parsed) || parsed < 1 ? 1 : parsed,
-    }));
   };
 
   const handleAddToCart = async (product) => {
     const inCart = getCartQuantity(product.id);
     const availableStock = Math.max(0, product.stock - inCart);
-    const qty = quantities[product.id] || 1;
+    // Use exactly what the input shows (it is clamped to the available stock)
+    const qty = clampQuantity(quantities[product.id] ?? 1, availableStock);
     if (qty > availableStock) {
       showError(`Cannot add ${qty} items. Only ${availableStock} in stock.`);
       return;
     }
+    setQuantities((prev) => ({ ...prev, [product.id]: qty }));
 
     // Optimistically update CartContext immediately so stock and badge update instantly
     setCartItems((prevItems) => {
@@ -182,13 +213,9 @@ export const ProductsPage = () => {
 
   const handleResetFilters = () => {
     setSearch('');
-    setDebouncedSearch('');
-    setCategory('');
-    setMinPrice('');
-    setMaxPrice('');
-    setSort('id');
-    setOrder('asc');
-    setCurrentPage(1);
+    setMinPriceDraft('');
+    setMaxPriceDraft('');
+    setSearchParams({}, { replace: true });
   };
 
   return (
@@ -208,6 +235,10 @@ export const ProductsPage = () => {
           <div className="filter-item search-filter">
             <label htmlFor="search" className="filter-label">Search</label>
             <div className="search-input-wrapper">
+              <svg className="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
               <input
                 id="search"
                 type="text"
@@ -216,6 +247,7 @@ export const ProductsPage = () => {
                 placeholder="Search products by title or description..."
                 className="form-input"
                 data-testid="search-input"
+                autoComplete="off"
               />
               {search && (
                 <button
@@ -224,7 +256,10 @@ export const ProductsPage = () => {
                   onClick={() => setSearch('')}
                   aria-label="Clear search"
                 >
-                  ×
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
                 </button>
               )}
             </div>
@@ -235,7 +270,7 @@ export const ProductsPage = () => {
             <select
               id="category"
               value={category}
-              onChange={(e) => handleCategoryChange(e.target.value)}
+              onChange={(e) => updateParams({ category: e.target.value })}
               className="form-select"
               data-testid="category-filter"
             >
@@ -248,28 +283,30 @@ export const ProductsPage = () => {
             </select>
           </div>
 
-          <div className="filter-item price-range-group">
-            <label className="filter-label">Price Range ($)</label>
+          <div className="filter-item price-range-group" role="group" aria-labelledby="price-range-label">
+            <span id="price-range-label" className="filter-label">Price Range ($)</span>
             <div className="price-inputs">
               <input
                 type="number"
-                value={minPrice}
-                onChange={(e) => handleMinPriceChange(e.target.value)}
+                value={minPriceDraft}
+                onChange={(e) => setMinPriceDraft(e.target.value)}
                 placeholder="Min"
+                aria-label="Minimum price"
                 min="0"
                 step="0.01"
-                className="form-input price-input"
+                className={`form-input price-input ${priceRangeInvalid ? 'input-error' : ''}`}
                 data-testid="min-price-filter"
               />
-              <span className="price-separator">-</span>
+              <span className="price-separator" aria-hidden="true">–</span>
               <input
                 type="number"
-                value={maxPrice}
-                onChange={(e) => handleMaxPriceChange(e.target.value)}
+                value={maxPriceDraft}
+                onChange={(e) => setMaxPriceDraft(e.target.value)}
                 placeholder="Max"
+                aria-label="Maximum price"
                 min="0"
                 step="0.01"
-                className="form-input price-input"
+                className={`form-input price-input ${priceRangeInvalid ? 'input-error' : ''}`}
                 data-testid="max-price-filter"
               />
             </div>
@@ -306,6 +343,11 @@ export const ProductsPage = () => {
             </button>
           </div>
         </div>
+        {priceRangeInvalid && (
+          <p className="filter-hint" role="alert" data-testid="price-range-error">
+            Minimum price is greater than maximum price, so no products can match.
+          </p>
+        )}
       </section>
 
       {/* Persistent progress bar slot to completely eliminate layout shifts */}
@@ -340,7 +382,7 @@ export const ProductsPage = () => {
       ) : (
         <>
           <div className="catalog-meta">
-            <span className="results-count" data-testid="results-count">
+            <span className="results-count" data-testid="results-count" aria-live="polite">
               Showing {products.length} of {pagination.total} products
             </span>
             <span className="page-indicator">
@@ -356,7 +398,9 @@ export const ProductsPage = () => {
             {products.map((product) => {
               const inCart = getCartQuantity(product.id);
               const availableStock = Math.max(0, product.stock - inCart);
-              const qty = quantities[product.id] || 1;
+              // Drafts are strings while typing; settled numbers are re-clamped as stock changes
+              const qtyDraft = quantities[product.id] ?? 1;
+              const qtyValue = typeof qtyDraft === 'number' ? Math.min(qtyDraft, Math.max(1, availableStock)) : qtyDraft;
               const isOutOfStock = availableStock <= 0;
               const imageUrl = product.imageUrl || product.image_url || '/images/placeholder.svg';
 
@@ -409,9 +453,14 @@ export const ProductsPage = () => {
                           type="number"
                           min="1"
                           max={availableStock || 1}
-                          value={isOutOfStock ? 0 : Math.min(qty, availableStock || 1)}
+                          inputMode="numeric"
+                          value={isOutOfStock ? 0 : qtyValue}
                           disabled={isOutOfStock}
-                          onChange={(e) => handleQuantityChange(product.id, e.target.value)}
+                          onChange={(e) => setQuantities((prev) => ({ ...prev, [product.id]: e.target.value }))}
+                          onBlur={(e) => setQuantities((prev) => ({ ...prev, [product.id]: clampQuantity(e.target.value, availableStock) }))}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !isOutOfStock) handleAddToCart(product);
+                          }}
                           className="qty-input"
                           data-testid={`product-qty-${product.id}`}
                         />
@@ -434,7 +483,7 @@ export const ProductsPage = () => {
 
           {/* Pagination */}
           {pagination.totalPages > 1 && (
-            <div className="pagination-wrapper" data-testid="pagination">
+            <nav className="pagination-wrapper" data-testid="pagination" aria-label="Product pages">
               <button
                 type="button"
                 onClick={() => handlePageChange(pagination.page - 1)}
@@ -442,6 +491,9 @@ export const ProductsPage = () => {
                 className="btn btn-outline-secondary pagination-btn"
                 data-testid="pagination-prev"
               >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <polyline points="15 18 9 12 15 6" />
+                </svg>
                 Previous
               </button>
 
@@ -453,6 +505,8 @@ export const ProductsPage = () => {
                     onClick={() => handlePageChange(pageNum)}
                     className={`pagination-num ${pageNum === pagination.page ? 'active' : ''}`}
                     data-testid={`pagination-page-${pageNum}`}
+                    aria-current={pageNum === pagination.page ? 'page' : undefined}
+                    aria-label={`Page ${pageNum}`}
                   >
                     {pageNum}
                   </button>
@@ -467,8 +521,11 @@ export const ProductsPage = () => {
                 data-testid="pagination-next"
               >
                 Next
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <polyline points="9 18 15 12 9 6" />
+                </svg>
               </button>
-            </div>
+            </nav>
           )}
         </>
       )}
