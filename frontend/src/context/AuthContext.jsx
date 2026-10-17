@@ -58,6 +58,22 @@ export const AuthProvider = ({ children }) => {
     return response.data;
   };
 
+  const register = async (name, email, password) => {
+    const response = await api.post("/auth/register", { name, email, password });
+    const { accessToken, refreshToken, user: registeredUser } = response.data;
+
+    if (accessToken) {
+      localStorage.setItem("accessToken", accessToken);
+      if (refreshToken) {
+        localStorage.setItem("refreshToken", refreshToken);
+      }
+      localStorage.setItem("user", JSON.stringify(registeredUser));
+      setToken(accessToken);
+      setUser(registeredUser);
+    }
+    return response.data;
+  };
+
   const logout = async () => {
     const refreshToken = localStorage.getItem('refreshToken');
     try {
@@ -86,6 +102,7 @@ export const AuthProvider = ({ children }) => {
         isAuthenticated: !!token,
         loading,
         login,
+        register,
         logout,
         updateProfile,
       }}
