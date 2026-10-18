@@ -8,6 +8,10 @@ const { errorResponse, successResponse } = require('../utils/responses');
 
 const router = express.Router();
 
+// Express 4 does not catch rejections from async handlers; without this a DB or
+// bcrypt failure becomes an unhandled rejection and takes the whole process down.
+const asyncHandler = (handler) => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
+
 function generateAccessToken(user) {
   return jwt.sign(
     { id: user.id, email: user.email, role: user.role },
@@ -27,7 +31,7 @@ function generateRefreshToken(user) {
 /**
  * POST /api/auth/register
  */
-router.post('/register', async (req, res, next) => {
+router.post('/register', asyncHandler(async (req, res, next) => {
   const { name, email, password } = req.body;
 
   // Validate required fields
@@ -85,12 +89,12 @@ router.post('/register', async (req, res, next) => {
     tokenType: 'Bearer',
     expiresIn: process.env.JWT_ACCESS_EXPIRY || '15m',
   }, 201);
-});
+}));
 
 /**
  * POST /api/auth/login
  */
-router.post('/login', async (req, res, next) => {
+router.post('/login', asyncHandler(async (req, res, next) => {
   const identifier = req.body.email || req.body.username;
   const { password } = req.body;
 
@@ -107,9 +111,9 @@ router.post('/login', async (req, res, next) => {
 
   if (!user) {
     if (cleanId === 'admin') {
-      user = db.prepare('SELECT * FROM users WHERE role = "admin" ORDER BY id ASC LIMIT 1').get();
+      user = db.prepare('SELECT * FROM users WHERE role = ? ORDER BY id ASC LIMIT 1').get('admin');
     } else if (cleanId === 'user') {
-      user = db.prepare('SELECT * FROM users WHERE email = "user@test.com" OR role = "user" ORDER BY id ASC LIMIT 1').get();
+      user = db.prepare('SELECT * FROM users WHERE email = ? OR role = ? ORDER BY id ASC LIMIT 1').get('user@test.com', 'user');
     }
   }
 
@@ -138,7 +142,7 @@ router.post('/login', async (req, res, next) => {
     tokenType: 'Bearer',
     expiresIn: process.env.JWT_ACCESS_EXPIRY || '15m',
   });
-});
+}));
 
 /**
  * POST /api/auth/refresh

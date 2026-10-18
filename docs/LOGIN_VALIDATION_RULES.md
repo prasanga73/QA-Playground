@@ -12,9 +12,9 @@ This document specifies the user interface elements, internal constraints, valid
 | **Card Container** | `<div className="auth-card">` | Centered responsive card with theme-aware background | `login-card` |
 | **Theme Toggle** | `<button className="theme-toggle-btn">` | Switches between dark and light themes | `theme-toggle` |
 | **Full Name Field (Register)** | `<input type="text">` | Required in register mode; min 2 chars | `register-name` |
-| **Email / Username Field** | `<input type="email">` | Supports valid email/username. Spaces auto-trimmed. Hidden length limit of 254 chars. | `login-email` |
+| **Email / Username Field** | `<input type="text">` (login) / `<input type="email">` (register) | Login accepts an email **or** a username; register requires an email. Spaces auto-trimmed. Hidden length limit of 254 chars. | `login-email` |
 | **Email Inline Error** | `<span className="field-error-message">` | Rendered immediately under input when touched & invalid | `login-email-error` |
-| **Password Field** | `<input type="password\|text">` | Masked by default, controlled by toggle button. Hidden limit 8–20 chars. | `login-password` |
+| **Password Field** | `<input type="password\|text">` | Masked by default, controlled by toggle button. Hidden limit 8–20 chars **in register mode only**; login accepts any non-empty password. | `login-password` |
 | **Password Toggle** | `<button type="button">` | Switches input type between `password` and `text`, updates ARIA label | `login-password-toggle` |
 | **Password Inline Error** | `<span className="field-error-message">` | Rendered immediately under input when touched & invalid | `login-password-error` |
 | **General Error Area** | `<div className="alert alert-danger">` | Displays API errors, bad credentials, duplicate email (409), or lockout | `login-error` |
@@ -30,26 +30,30 @@ This document specifies the user interface elements, internal constraints, valid
 
 ### Field 1: Email / Username
 - **Required:** Yes. Cannot be empty or purely whitespace.
-  - *Error message on empty:* `"Email is required"`
+  - *Error message on empty:* `"Email or username is required"` (login) / `"Email is required"` (register)
 - **Format Validation:**
-  - Standard RFC 5322 regex pattern check: `/^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/`
-  - *Error message on invalid format:* `"Invalid email format"`
+  - `POST /api/auth/login` accepts an email address **or** a username (it matches on `LOWER(email)` or `LOWER(name)`), so the login form must accept both. Registration always creates an email-addressed account and therefore stays email-only.
+  - **Login mode:** a value containing `@` is checked against the email pattern below. A value without `@` is treated as a username: min 2 chars, matching `/^[a-zA-Z0-9][a-zA-Z0-9 ._'-]*$/` (names may contain spaces, e.g. `Admin User`).
+    - *Error message on invalid identifier:* `"Invalid email or username"`
+  - **Register mode:** standard RFC 5322 regex pattern check: `/^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/`
+    - *Error message on invalid format:* `"Invalid email format"`
 - **Whitespace Handling:**
   - Leading and trailing spaces are automatically trimmed (`email.trim()`) before validation and before the API payload is constructed.
 - **Casing:**
-  - Evaluated case-insensitively and normalized (`.toLowerCase()`).
+  - Evaluated case-insensitively; the backend normalizes the identifier, so `ADMIN`, `admin` and `Admin User` all resolve to the same account. The register payload is normalized with `.toLowerCase()`; the login identifier is sent trimmed but with its original casing.
 - **Maximum Length:**
   - Hard internal constraint via `maxLength="254"` on the input DOM element (RFC 5321 standard maximum for email addresses) and internal length verification. No visual clutter counter displayed.
 
 ### Field 2: Password
-- **Required:** Yes. Cannot be empty.
+- **Required:** Yes. Cannot be empty. Applies in **both** modes.
   - *Error message on empty:* `"Password is required"`
-- **Minimum Length:**
+- **Strength rules apply in register mode only.** Length and complexity describe how a password may be *chosen*; enforcing them at sign-in would lock out any account whose password predates the current policy (for example one created directly through the API, which accepts 6+ characters). Login therefore validates only that a password was entered and lets the backend decide.
+- **Minimum Length (Register Mode):**
   - Minimum constraint: **8 characters**.
   - *Error message if < 8:* `"Password must be at least 8 characters"`
-- **Maximum Length:**
+- **Maximum Length (Register Mode):**
   - Maximum constraint: **20 characters**.
-  - Hard internal constraint via `maxLength="20"` on the DOM element and internal validation. No visual clutter counter displayed.
+  - Hard internal constraint via `maxLength="20"` on the DOM element and internal validation. No visual clutter counter displayed. In login mode `maxLength` is **not** set, so a longer existing password is not silently truncated.
   - *Error message if > 20:* `"Password cannot exceed 20 characters"`
 - **Complexity (Register Mode):**
   - Requires uppercase letter, lowercase letter, number, and special character (`@$!%*?&#`).

@@ -64,13 +64,22 @@ export const LoginPage = () => {
   const validateEmail = (val) => {
     const trimmed = (val || '').trim();
     const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+    // Names are valid sign-in identifiers too, so allow the characters they use
+    const usernameRegex = /^[a-zA-Z0-9][a-zA-Z0-9 ._'-]*$/;
 
     if (!trimmed) {
-      return 'Email is required';
+      return authMode === 'login' ? 'Email or username is required' : 'Email is required';
     }
     // Internal max length 254 enforcement
     if (trimmed.length > 254) {
       return 'Email cannot exceed 254 characters';
+    }
+    // Registration always creates an email-addressed account; sign-in takes either form
+    if (authMode === 'login' && !trimmed.includes('@')) {
+      if (trimmed.length < 2 || !usernameRegex.test(trimmed)) {
+        return 'Invalid email or username';
+      }
+      return '';
     }
     if (!emailRegex.test(trimmed)) {
       return 'Invalid email format';
@@ -82,15 +91,16 @@ export const LoginPage = () => {
     if (!val) {
       return 'Password is required';
     }
-    // Internal 8 to 20 length enforcement
-    if (val.length < 8) {
-      return 'Password must be at least 8 characters';
-    }
-    if (val.length > 20) {
-      return 'Password cannot exceed 20 characters';
-    }
-    // Password complexity check for registration
+    // Strength rules apply when choosing a password, not when presenting an existing
+    // one: enforcing them on sign-in rejects accounts whose password predates them.
     if (authMode === 'register') {
+      // Internal 8 to 20 length enforcement
+      if (val.length < 8) {
+        return 'Password must be at least 8 characters';
+      }
+      if (val.length > 20) {
+        return 'Password cannot exceed 20 characters';
+      }
       const passwordComplexityRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])/;
       if (!passwordComplexityRegex.test(val)) {
         return 'Password must include uppercase, lowercase, number, and special character';
@@ -203,6 +213,7 @@ export const LoginPage = () => {
     }
 
     const cleanEmail = email.trim().toLowerCase();
+    const identifier = authMode === 'login' ? email.trim() : cleanEmail;
     const cleanPassword = password;
 
     setIsSubmitting(true);
@@ -214,7 +225,7 @@ export const LoginPage = () => {
         navigate(redirectTo, { replace: true });
       } else {
         // Login existing account
-        await login(cleanEmail, cleanPassword);
+        await login(identifier, cleanPassword);
         showSuccess('Welcome back! Login successful.');
         navigate(redirectTo, { replace: true });
       }
@@ -353,18 +364,18 @@ export const LoginPage = () => {
           {/* Field: Email Address (or Username) */}
           <div className="form-group">
             <label htmlFor="email" className="form-label">
-              {authMode === 'login' ? 'Email Address' : 'Email Address'}
+              {authMode === 'login' ? 'Email or Username' : 'Email Address'}
             </label>
             <input
               ref={emailInputRef}
               id="email"
-              type="email"
+              type={authMode === 'login' ? 'text' : 'email'}
               value={email}
               maxLength={254}
               onChange={handleEmailChange}
               onBlur={handleEmailBlur}
               disabled={isSubmitting}
-              placeholder="e.g. user@test.com"
+              placeholder={authMode === 'login' ? 'e.g. user@test.com or admin' : 'e.g. user@test.com'}
               className={`form-input ${errors.email ? 'input-error' : ''}`}
               data-testid="login-email"
               autoComplete="username email"
@@ -389,7 +400,7 @@ export const LoginPage = () => {
                 id="password"
                 type={showPassword ? 'text' : 'password'}
                 value={password}
-                maxLength={20}
+                maxLength={authMode === 'login' ? undefined : 20}
                 onChange={handlePasswordChange}
                 onBlur={handlePasswordBlur}
                 disabled={isSubmitting}
