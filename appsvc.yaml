@@ -1,0 +1,3 @@
+version: 1
+
+run: cd backend && npm start
