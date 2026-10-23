@@ -5,7 +5,6 @@
 The application consists of a Node.js/Express SQLite REST backend and a modern React (Vite) single-page application built exclusively with plain CSS.
 
 ---
-
 ## 1. Quick Start
 
 ### Prerequisites
