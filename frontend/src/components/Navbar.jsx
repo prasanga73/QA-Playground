@@ -76,6 +76,17 @@ export const Navbar = () => {
             Profile
           </NavLink>
 
+          {user?.role === 'admin' && (
+            <NavLink
+              to="/admin/products"
+              className={({ isActive }) => (isActive ? 'nav-link nav-link-admin active' : 'nav-link nav-link-admin')}
+              data-testid="nav-admin-products"
+              title="Manage products (admin only)"
+            >
+              Manage Products
+            </NavLink>
+          )}
+
           <a
             href={getDocsUrl(theme)}
             target="_blank"

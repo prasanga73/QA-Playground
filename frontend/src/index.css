@@ -1519,6 +1519,166 @@ body {
 }
 
 /* ==========================================================================
+   Admin — Product Management
+   ========================================================================== */
+
+.nav-link-admin {
+  color: var(--primary);
+}
+
+.admin-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.admin-products-table {
+  min-width: 920px;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.admin-products-table th,
+.admin-products-table td {
+  white-space: nowrap;
+}
+
+.admin-thumbnail {
+  width: 44px;
+  height: 44px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  background-color: var(--bg-panel);
+  flex-shrink: 0;
+}
+
+.admin-name-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  max-width: 280px;
+  white-space: normal;
+}
+
+.admin-product-desc {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The product form needs more room than the confirm dialogs */
+.modal-card-lg {
+  max-width: 580px;
+}
+
+.admin-form-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-height: calc(100vh - 14rem);
+  overflow-y: auto;
+}
+
+.admin-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.form-textarea {
+  resize: vertical;
+  min-height: 72px;
+  font-family: inherit;
+  line-height: 1.5;
+}
+
+.admin-image-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.admin-image-preview {
+  width: 72px;
+  height: 72px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  background-color: var(--bg-panel);
+  flex-shrink: 0;
+}
+
+.admin-image-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-upload-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.admin-upload-progress {
+  margin-top: 0.5rem;
+  height: 4px;
+  width: 100%;
+  background-color: var(--bg-surface-active);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.admin-upload-progress-bar {
+  height: 100%;
+  background-color: var(--primary);
+  border-radius: 2px;
+  transition: width 0.15s linear;
+}
+
+.admin-upload-filename {
+  display: block;
+  margin-top: 0.375rem;
+  font-size: 0.75rem;
+  color: var(--success-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-url-label {
+  display: block;
+  margin: 0.625rem 0 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.admin-image-input code {
+  font-size: 0.75rem;
+  padding: 0.0625rem 0.25rem;
+  border-radius: 4px;
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+}
+
+@media (max-width: 640px) {
+  .admin-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-page-header .btn {
+    width: 100%;
+  }
+}
+
+/* ==========================================================================
    Auth / Login Page
    ========================================================================== */
 

@@ -79,7 +79,7 @@ Located in [backend/data/users.csv](file:///home/ethereal/Downloads/QA%20TechAxi
 
 ## 4. Application Pages & Architecture
 
-The frontend contains **exactly 5 pages** plus a 404 fallback:
+The frontend contains **5 shopper pages**, **1 admin-only page**, plus a 404 fallback:
 
 1. **/login (Public):**
    - Email and password inputs with show/hide password toggle.
@@ -112,7 +112,18 @@ The frontend contains **exactly 5 pages** plus a 404 fallback:
    - Editable Name and Email fields with validation and "Save Changes" (`PUT /api/users/:id`).
    - Logout button that revokes tokens and navigates to `/login`.
 
-6. *** (404 Fallback):**
+6. **/admin/products (Protected — admin role only):**
+   - Admin-only catalog management backed by `POST`, `PUT`, and `DELETE /api/products`.
+   - Linked from the navbar as "Manage Products"; the link is rendered only for `admin` accounts.
+   - Non-admin users who open the URL directly get an "Admin access required" state (`data-testid="admin-forbidden"`) instead of a silent redirect.
+   - Product table with ID, thumbnail, name/description, category, price, stock badge, and last-updated timestamp.
+   - 300ms debounced search, category filter, sort dropdown (default newest-first), and pagination at 10 rows per page.
+   - "Add Product" opens a modal form; "Edit" opens the same form pre-filled from the row.
+   - Form fields: Name*, Description, Price*, Stock, Category*, Product Image — with a live image preview and inline validation mirroring the server rules (price > 0, integer stock >= 0, category from the fixed list, `imageUrl` as a `/images/...` path or http(s) URL, max 255 chars).
+   - The image can be set two ways, in both the add and the edit form: **Upload Image** picks a local file and posts it to `POST /api/products/upload-image` (with a progress bar), or an image URL can be pasted directly. Either path writes the same `imageUrl` field, and **Clear** resets it to the placeholder.
+   - "Delete" opens a confirmation modal before calling `DELETE /api/products/:id`.
+
+7. *** (404 Fallback):**
    - Clean 404 error page with action button linking back to `/products`.
 
 ---
@@ -149,6 +160,7 @@ Every interactive element includes stable, deterministic `data-testid` identifie
 | Cart Badge | `cart-badge` | Dynamic item count badge |
 | Orders Link | `nav-orders` | Navlink to `/orders` |
 | Profile Link | `nav-profile` | Navlink to `/profile` |
+| Manage Products Link | `nav-admin-products` | Navlink to `/admin/products` (admins only) |
 | Logout Button | `nav-logout` | Header logout button |
 | Success Toast | `toast-success` | Success notification bubble |
 | Error Toast | `toast-error` | Error notification bubble |
@@ -200,6 +212,46 @@ Every interactive element includes stable, deterministic `data-testid` identifie
 | Save Button | `profile-save` | Save changes button |
 | Profile Logout | `profile-logout` | Logout button on profile |
 
+### Admin Product Management Elements
+| Element | `data-testid` | Description |
+|---|---|---|
+| Admin Page | `admin-products-page` | Page container for `/admin/products` |
+| Forbidden State | `admin-forbidden` | "Admin access required" state for non-admins |
+| Add Product Button | `admin-add-product-btn` | Opens the create-product modal |
+| Search Input | `admin-product-search` | Debounced name/description search |
+| Category Filter | `admin-category-filter` | Category filter select |
+| Sort Dropdown | `admin-sort-select` | Sort field & direction selector |
+| Filter Reset | `admin-filter-reset-btn` | Resets search, category, and sort |
+| Products Table | `admin-products-table` | Admin product management table |
+| Product Row | `admin-product-row-{id}` | Table row for product ID |
+| Product Name Cell | `admin-product-name-{id}` | Name text in the row |
+| Product Price Cell | `admin-product-price-{id}` | Formatted price in the row |
+| Product Stock Cell | `admin-product-stock-{id}` | Stock badge in the row |
+| Edit Button | `admin-edit-product-{id}` | Opens the modal pre-filled for that product |
+| Delete Button | `admin-delete-product-{id}` | Opens the delete confirmation modal |
+| Product Form Modal | `admin-product-modal` | Create/edit modal container |
+| Name Input | `admin-form-name` | Product name input |
+| Description Input | `admin-form-description` | Product description textarea |
+| Price Input | `admin-form-price` | Product price input |
+| Stock Input | `admin-form-stock` | Product stock input |
+| Category Select | `admin-form-category` | Product category select |
+| Image URL Input | `admin-form-image-url` | Product image URL input |
+| Image File Input | `admin-form-image-file` | Hidden `<input type="file">` for the upload |
+| Upload Image Button | `admin-form-image-upload-btn` | Opens the file picker |
+| Upload Progress | `admin-form-image-upload-progress` | Progress bar shown during upload |
+| Uploaded File Name | `admin-form-image-uploaded-name` | Confirmation of the uploaded file |
+| Clear Image Button | `admin-form-image-clear-btn` | Resets the image back to the placeholder |
+| Image Preview | `admin-form-image-preview` | Live preview of the current image |
+| Field Errors | `admin-form-{field}-error` | Inline validation error per field |
+| Form API Error | `admin-form-error` | Server-side (422) error banner in the modal |
+| Submit Button | `admin-form-submit` | Creates or saves the product |
+| Cancel Button | `admin-form-cancel` | Dismisses the form modal |
+| Delete Modal | `admin-delete-modal` | Delete confirmation dialog container |
+| Confirm Delete Button | `admin-confirm-delete-btn` | Confirms deletion |
+| Pagination Next/Prev | `admin-pagination-next` / `admin-pagination-prev` | Admin table pagination controls |
+| Empty State | `admin-products-empty` | No-products-found state |
+| Loading State | `admin-products-loading` | Table loading spinner |
+
 ---
 
 ## 6. Deliverables Overview
@@ -223,4 +275,5 @@ Every interactive element includes stable, deterministic `data-testid` identifie
 - **Search Optimization:** Search keystrokes are debounced by 300ms, in-flight obsolete requests are aborted via `AbortController`, and the product grid maintains previous items during refetches with a discreet progress indicator.
 - **Token Storage:** In accordance with standard SPA testing practices, JWT access and refresh tokens are stored in `localStorage` and managed by an Axios interceptor that retries on 401 with `/api/auth/refresh`.
 - **Database Engine:** SQLite in WAL (Write-Ahead Logging) mode is used with explicit foreign key support. No external database server installation is required.
+- **Product Image Uploads:** `POST /api/products/upload-image` (admin, multipart field `image`) accepts JPG, PNG, WebP, and GIF up to 2 MB and writes to `backend/public/images/uploads/` (git-ignored, created on boot), served at `/images/uploads/...`. Stored filenames are generated server-side (`u-<timestamp>-<random>.<ext>`) and never derived from the client filename. The declared content type must match the file's actual magic bytes, otherwise the file is discarded with a 422 — so renaming a non-image to `.png` is rejected. SVG upload is deliberately not allowed, since SVG can carry script and these files are served from the API origin. Uploads sit on the local filesystem, so on an ephemeral host (Railway/Vercel/Azure) they do not survive a redeploy; use image URLs there instead.
 - **Order Cancellation Window:** Orders with statuses `pending` or `confirmed` can be cancelled by the owner or admin. When cancelled, inventory stock is automatically refunded back to the products table.

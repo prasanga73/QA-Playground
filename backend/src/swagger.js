@@ -238,6 +238,54 @@ const openapiSpecification = {
         },
       },
     },
+    '/api/products/upload-image': {
+      post: {
+        summary: 'Upload a product image (Admin only)',
+        description:
+          'Multipart upload. Accepts JPG, PNG, WebP, or GIF up to 2 MB; the declared content type must match the actual file bytes. '
+          + 'Returns the URL to send as `imageUrl` when creating or updating a product.',
+        security: [{ bearerAuth: [] }],
+        tags: ['Products'],
+        requestBody: {
+          required: true,
+          content: {
+            'multipart/form-data': {
+              schema: {
+                type: 'object',
+                required: ['image'],
+                properties: {
+                  image: { type: 'string', format: 'binary', description: 'Image file (jpg, png, webp, or gif), max 2 MB' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: 'Image uploaded',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean', example: true },
+                    message: { type: 'string', example: 'Image uploaded successfully' },
+                    imageUrl: { type: 'string', example: '/images/uploads/u-1764280000000-a1b2c3d4e5f6.png' },
+                    filename: { type: 'string', example: 'u-1764280000000-a1b2c3d4e5f6.png' },
+                    mimeType: { type: 'string', example: 'image/png' },
+                    size: { type: 'integer', example: 48213 },
+                  },
+                },
+              },
+            },
+          },
+          401: { description: 'Missing or invalid token' },
+          403: { description: 'Admin access required' },
+          413: { description: 'Image exceeds the 2 MB limit' },
+          422: { description: 'No file supplied, unsupported type, or content does not match the declared type' },
+        },
+      },
+    },
     '/api/products/{id}': {
       get: {
         summary: 'Get product by ID',

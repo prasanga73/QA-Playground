@@ -7,12 +7,13 @@ import { ToastProvider } from './context/ToastContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Navbar from './components/Navbar';
 
-// Exactly 5 pages + 404
+// 5 shopper pages + an admin-only page + 404
 import LoginPage from './pages/LoginPage';
 import ProductsPage from './pages/ProductsPage';
 import CartPage from './pages/CartPage';
 import OrdersPage from './pages/OrdersPage';
 import ProfilePage from './pages/ProfilePage';
+import AdminProductsPage from './pages/AdminProductsPage';
 import NotFoundPage from './pages/NotFoundPage';
 
 export function App() {
@@ -68,6 +69,16 @@ export function App() {
                     element={
                       <ProtectedRoute>
                         <ProfilePage />
+                      </ProtectedRoute>
+                    }
+                  />
+
+                  {/* 6. /admin/products (protected, admin only) */}
+                  <Route
+                    path="/admin/products"
+                    element={
+                      <ProtectedRoute requireAdmin>
+                        <AdminProductsPage />
                       </ProtectedRoute>
                     }
                   />
