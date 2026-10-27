@@ -127,9 +127,9 @@ router.post('/items', authenticate, (req, res) => {
 });
 
 /**
- * PUT /api/cart/items/:itemId (update item quantity)
+ * PUT and PATCH /api/cart/items/:itemId (update item quantity)
  */
-router.put('/items/:itemId', authenticate, (req, res) => {
+function updateCartItem(req, res) {
   const { quantity } = req.body;
   const parsedQty = parseInt(quantity, 10);
 
@@ -181,11 +181,10 @@ router.put('/items/:itemId', authenticate, (req, res) => {
       imageUrl: item.image_url || '/images/placeholder.svg',
     },
   });
-});
+}
 
-router.patch('/items/:itemId', authenticate, (req, res) => {
-  return router.handle({ ...req, method: 'PUT' }, res);
-});
+router.put('/items/:itemId', authenticate, updateCartItem);
+router.patch('/items/:itemId', authenticate, updateCartItem);
 
 /**
  * DELETE /api/cart/items/:itemId (remove item from cart)
