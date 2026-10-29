@@ -29,7 +29,7 @@
 ### Cart Management
 - **FR-14 (View Cart):** Authenticated users shall retrieve their current active cart items, item counts, line totals, and overall total via `GET /api/cart`.
 - **FR-15 (Add to Cart):** Authenticated users shall add items or increment quantity via `POST /api/cart/items`. The system shall reject requests exceeding current warehouse inventory with HTTP 400.
-- **FR-16 (Remove Cart Item):** Authenticated users shall remove individual cart items via `DELETE /api/cart/items/:itemId`.
+- **FR-16 (Remove Cart Item):** Authenticated users shall remove individual cart items via `DELETE /api/cart/items/:productId`. A cart holds at most one line per product, so the product id addresses the line.
 
 ### Orders & Checkout
 - **FR-17 (Create Order):** Authenticated users shall convert their active cart items into an order via `POST /api/orders`. The transaction shall verify stock, deduct inventory, record line items, and clear the user's cart.

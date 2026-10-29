@@ -284,13 +284,13 @@ export const OrdersPage = () => {
                                     </thead>
                                     <tbody>
                                       {details.items.map((item, idx) => (
-                                        <tr key={item.id || idx}>
+                                        <tr key={item.product_id ?? idx}>
                                           <td className="order-product-cell">
                                             <div className="order-item-media">
                                               <ProductImage
-                                                src={item.imageUrl || item.image_url || '/images/placeholder.svg'}
+                                                src={item.imageUrl || '/images/placeholder.svg'}
                                                 alt={item.product_name}
-                                                testId={`order-item-image-${item.id || idx}`}
+                                                testId={`order-item-image-${item.product_id ?? idx}`}
                                                 className="order-thumbnail"
                                               />
                                               <span>{item.product_name}</span>

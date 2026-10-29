@@ -67,13 +67,13 @@ const uploadImage = multer({
   },
 }).single('image');
 
+// Rows carry the image_url column; responses expose it once, as imageUrl.
 function formatProduct(p) {
   if (!p) return p;
-  const imageUrl = p.imageUrl || p.image_url || '/images/placeholder.svg';
+  const { image_url: column, imageUrl: camel, ...rest } = p;
   return {
-    ...p,
-    imageUrl,
-    image_url: imageUrl,
+    ...rest,
+    imageUrl: camel || column || '/images/placeholder.svg',
   };
 }
 

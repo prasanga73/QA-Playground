@@ -63,15 +63,20 @@ router.post('/', authenticate, (req, res) => {
     return orderId;
   });
 
+  // The line's own row id and order_id are left out: the items are nested in the
+  // order that owns them, and no endpoint addresses a single order line.
   const getOrderItems = (orderId) => {
     const items = db.prepare(`
-      SELECT oi.*, p.image_url
+      SELECT oi.product_id, oi.product_name, oi.product_price, oi.quantity, p.image_url
       FROM order_items oi
       LEFT JOIN products p ON oi.product_id = p.id
       WHERE oi.order_id = ?
     `).all(orderId);
     return items.map(item => ({
-      ...item,
+      product_id: item.product_id,
+      product_name: item.product_name,
+      product_price: item.product_price,
+      quantity: item.quantity,
       imageUrl: item.image_url || '/images/placeholder.svg',
     }));
   };
@@ -152,12 +157,15 @@ router.get('/:id', authenticate, (req, res) => {
   }
 
   const items = db.prepare(`
-    SELECT oi.*, p.image_url
+    SELECT oi.product_id, oi.product_name, oi.product_price, oi.quantity, p.image_url
     FROM order_items oi
     LEFT JOIN products p ON oi.product_id = p.id
     WHERE oi.order_id = ?
   `).all(order.id).map(item => ({
-    ...item,
+    product_id: item.product_id,
+    product_name: item.product_name,
+    product_price: item.product_price,
+    quantity: item.quantity,
     imageUrl: item.image_url || '/images/placeholder.svg',
   }));
 

@@ -402,7 +402,7 @@ export const ProductsPage = () => {
               const qtyDraft = quantities[product.id] ?? 1;
               const qtyValue = typeof qtyDraft === 'number' ? Math.min(qtyDraft, Math.max(1, availableStock)) : qtyDraft;
               const isOutOfStock = availableStock <= 0;
-              const imageUrl = product.imageUrl || product.image_url || '/images/placeholder.svg';
+              const imageUrl = product.imageUrl || '/images/placeholder.svg';
 
               return (
                 <div

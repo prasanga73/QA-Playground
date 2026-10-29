@@ -185,7 +185,7 @@ export const AdminProductsPage = () => {
       price: product.price === null || product.price === undefined ? '' : String(product.price),
       stock: product.stock === null || product.stock === undefined ? '' : String(product.stock),
       category: product.category || '',
-      imageUrl: product.imageUrl || product.image_url || '',
+      imageUrl: product.imageUrl || '',
     });
     setFormErrors({});
     setFormApiError('');
@@ -522,7 +522,7 @@ export const AdminProductsPage = () => {
                 </thead>
                 <tbody>
                   {products.map((product) => {
-                    const imageUrl = product.imageUrl || product.image_url || '/images/placeholder.svg';
+                    const imageUrl = product.imageUrl || '/images/placeholder.svg';
 
                     return (
                       <tr key={product.id} data-testid={`admin-product-row-${product.id}`}>

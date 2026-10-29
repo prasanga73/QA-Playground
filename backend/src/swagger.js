@@ -41,7 +41,7 @@ const openapiSpecification = {
           price: { type: 'number', example: 79.99 },
           stock: { type: 'integer', example: 150 },
           category: { type: 'string', example: 'Electronics' },
-          image_url: { type: 'string', example: '/images/products/p-001.jpg' },
+          imageUrl: { type: 'string', example: '/images/products/p-001.jpg' },
         },
       },
       CartItem: {

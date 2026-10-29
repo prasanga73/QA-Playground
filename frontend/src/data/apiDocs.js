@@ -40,8 +40,7 @@ const PRODUCT_FIELDS = (p = 'product') => [
   { name: `${p}.price`, type: 'number', desc: 'Unit price, always > 0.' },
   { name: `${p}.stock`, type: 'integer', desc: 'Units available.' },
   { name: `${p}.category`, type: 'string', desc: `One of: ${CATEGORIES}.` },
-  { name: `${p}.image_url`, type: 'string', desc: 'Stored column.' },
-  { name: `${p}.imageUrl`, type: 'string', desc: 'Same value, placeholder when null.' },
+  { name: `${p}.imageUrl`, type: 'string', desc: '/images/… path or http(s) URL; placeholder when none is set.' },
   { name: `${p}.created_at`, type: 'string', desc: 'UTC timestamp.' },
   { name: `${p}.updated_at`, type: 'string', desc: 'UTC timestamp.' },
 ];
@@ -72,14 +71,11 @@ const ORDER_FIELDS = (p = 'order') => [
 ];
 
 const ORDER_ITEM_FIELDS = [
-  { name: 'order.items[].id', type: 'integer', desc: 'Line id.' },
-  { name: 'order.items[].order_id', type: 'integer', desc: 'Parent order.' },
   { name: 'order.items[].product_id', type: 'integer', desc: 'Product the line came from.' },
   { name: 'order.items[].product_name', type: 'string', desc: 'Name captured at purchase time.' },
   { name: 'order.items[].product_price', type: 'number', desc: 'Price captured at purchase time.' },
   { name: 'order.items[].quantity', type: 'integer', desc: 'Units ordered.' },
-  { name: 'order.items[].image_url', type: 'string | null', desc: 'Null if the product is gone.' },
-  { name: 'order.items[].imageUrl', type: 'string', desc: 'image_url or the placeholder.' },
+  { name: 'order.items[].imageUrl', type: 'string', desc: 'Product image, or the placeholder if the product is gone.' },
 ];
 
 export const API_GROUPS = [
@@ -460,7 +456,6 @@ export const API_GROUPS = [
       "price": 249.99,
       "stock": 42,
       "category": "Electronics",
-      "image_url": "/images/products/p-001.svg",
       "imageUrl": "/images/products/p-001.svg",
       "created_at": "2026-10-20 08:14:02",
       "updated_at": "2026-10-20 08:14:02"
@@ -503,7 +498,6 @@ export const API_GROUPS = [
     "price": 249.99,
     "stock": 42,
     "category": "Electronics",
-    "image_url": "/images/products/p-001.svg",
     "imageUrl": "/images/products/p-001.svg",
     "created_at": "2026-10-20 08:14:02",
     "updated_at": "2026-10-20 08:14:02"
@@ -541,7 +535,6 @@ export const API_GROUPS = [
     "price": 129.5,
     "stock": 25,
     "category": "Electronics",
-    "image_url": "/images/uploads/u-1761730001234-9f2c1a7b45de.jpg",
     "imageUrl": "/images/uploads/u-1761730001234-9f2c1a7b45de.jpg",
     "created_at": "2026-10-29 11:50:04",
     "updated_at": "2026-10-29 11:50:04"
@@ -580,7 +573,6 @@ export const API_GROUPS = [
     "price": 119.99,
     "stock": 40,
     "category": "Electronics",
-    "image_url": "/images/uploads/u-1761730001234-9f2c1a7b45de.jpg",
     "imageUrl": "/images/uploads/u-1761730001234-9f2c1a7b45de.jpg",
     "created_at": "2026-10-29 11:50:04",
     "updated_at": "2026-10-29 12:03:51"
@@ -871,13 +863,10 @@ export const API_GROUPS = [
     "updated_at": "2026-10-29 12:20:11",
     "items": [
       {
-        "id": 9,
-        "order_id": 7,
         "product_id": 1,
         "product_name": "Wireless Bluetooth Headphones",
         "product_price": 249.99,
         "quantity": 2,
-        "image_url": "/images/products/p-001.svg",
         "imageUrl": "/images/products/p-001.svg"
       }
     ]
@@ -965,13 +954,10 @@ export const API_GROUPS = [
     "updated_at": "2026-10-29 12:20:11",
     "items": [
       {
-        "id": 9,
-        "order_id": 7,
         "product_id": 1,
         "product_name": "Wireless Bluetooth Headphones",
         "product_price": 249.99,
         "quantity": 2,
-        "image_url": "/images/products/p-001.svg",
         "imageUrl": "/images/products/p-001.svg"
       }
     ]

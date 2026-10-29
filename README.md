@@ -218,7 +218,7 @@ Every interactive element includes stable, deterministic `data-testid` identifie
 | Place Order Button | `place-order-btn` | Order checkout button |
 | Orders Table | `orders-table` | Orders history table |
 | Order Row | `order-row-{id}` | Table row for order ID |
-| Order Item Image | `order-item-image-{id}` | Product image thumbnail in order breakdown |
+| Order Item Image | `order-item-image-{productId}` | Product image thumbnail in order breakdown |
 | Order Status Badge | `order-status-{id}` | Status pill badge |
 | Order Details Container | `order-details-{id}` | Expanded line items subtable |
 | Cancel Order Button | `cancel-order-{id}` | Cancel button on order row |

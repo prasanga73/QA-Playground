@@ -80,7 +80,7 @@
             "type": "string",
             "example": "Electronics"
           },
-          "image_url": {
+          "imageUrl": {
             "type": "string",
             "example": "/images/products/p-001.jpg"
           }
