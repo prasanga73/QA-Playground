@@ -5,7 +5,7 @@ import { useCart } from '../context/CartContext';
 import { useToast } from '../context/ToastContext';
 import { useTheme } from '../context/ThemeContext';
 
-// The docs page reads ?theme= so it opens in the same light/dark mode as the app
+// The backend docs page reads ?theme= so it opens in the same light/dark mode as the app
 const getDocsUrl = (theme) => {
   const envUrl = import.meta.env.VITE_API_URL;
   const cleanUrl = (envUrl || "").replace(/\/+$/, "");
@@ -92,15 +92,24 @@ export const Navbar = () => {
             target="_blank"
             rel="noopener noreferrer"
             className="nav-link"
-            data-testid="nav-docs"
-            title="API docs (opens in a new tab)"
+            data-testid="nav-apis"
+            title="Live Swagger UI for the backend APIs (opens in a new tab)"
           >
-            Docs
+            APIs
             <svg className="nav-external-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M7 17 17 7" />
               <path d="M8 7h9v9" />
             </svg>
           </a>
+
+          <NavLink
+            to="/apis-docs"
+            className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}
+            data-testid="nav-apis-docs"
+            title="Written reference: parameters and response fields of every endpoint"
+          >
+            APIs Docs
+          </NavLink>
         </div>
 
         <div className="nav-user-actions">

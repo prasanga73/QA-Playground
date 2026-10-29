@@ -7,13 +7,14 @@ import { ToastProvider } from './context/ToastContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Navbar from './components/Navbar';
 
-// 5 shopper pages + an admin-only page + 404
+// 5 shopper pages + an admin-only page + the API reference + 404
 import LoginPage from './pages/LoginPage';
 import ProductsPage from './pages/ProductsPage';
 import CartPage from './pages/CartPage';
 import OrdersPage from './pages/OrdersPage';
 import ProfilePage from './pages/ProfilePage';
 import AdminProductsPage from './pages/AdminProductsPage';
+import ApiDocsPage from './pages/ApiDocsPage';
 import NotFoundPage from './pages/NotFoundPage';
 
 export function App() {
@@ -82,6 +83,9 @@ export function App() {
                       </ProtectedRoute>
                     }
                   />
+
+                  {/* 7. /apis-docs (public: the written API reference needs no session) */}
+                  <Route path="/apis-docs" element={<ApiDocsPage />} />
 
                   {/* 404 Fallback */}
                   <Route path="*" element={<NotFoundPage />} />

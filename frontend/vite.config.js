@@ -7,19 +7,21 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/api': {
+      // Anchored regex, not a plain '/api' prefix: a bare prefix would also
+      // swallow app routes that merely start with those letters, e.g. /apis.
+      '^/api/': {
         target: 'http://localhost:3001',
         changeOrigin: true,
       },
-      '/images': {
+      '^/images/': {
         target: 'http://localhost:3001',
         changeOrigin: true,
       },
-      '/api-docs': {
+      '^/api-docs': {
         target: 'http://localhost:3001',
         changeOrigin: true,
       },
-      '/openapi.json': {
+      '^/openapi\\.json$': {
         target: 'http://localhost:3001',
         changeOrigin: true,
       },

@@ -26,6 +26,7 @@ npm run dev
 - **Frontend Application:** [http://localhost:5173](http://localhost:5173)
 - **Backend REST API:** [http://localhost:3001](http://localhost:3001)
 - **Static Product Images:** [http://localhost:3001/images/products/p-001.svg](http://localhost:3001/images/products/p-001.svg)
+- **In-app APIs Docs:** [http://localhost:5173/apis-docs](http://localhost:5173/apis-docs) — parameters, request body and response fields of every endpoint
 - **Interactive Swagger UI:** [http://localhost:3001/api-docs](http://localhost:3001/api-docs)
 - **OpenAPI 3.0 Specification:** [http://localhost:3001/openapi.json](http://localhost:3001/openapi.json)
 
@@ -123,7 +124,12 @@ The frontend contains **5 shopper pages**, **1 admin-only page**, plus a 404 fal
    - The image can be set two ways, in both the add and the edit form: **Upload Image** picks a local file and posts it to `POST /api/products/upload-image` (with a progress bar), or an image URL can be pasted directly. Either path writes the same `imageUrl` field, and **Clear** resets it to the placeholder.
    - "Delete" opens a confirmation modal before calling `DELETE /api/products/:id`.
 
-7. *** (404 Fallback):**
+7. **/apis-docs (Public):**
+   - Written reference for all 27 endpoints, grouped by Authentication, Users, Products, Cart, Orders and System.
+   - Each row shows what a request needs at a glance — method, path, access level and whether a body is required — and expands to its parameters, request body fields, response fields and error codes.
+   - Linked from the navbar as "APIs Docs"; the "APIs" link next to it opens the live Swagger UI. Deep-linkable per endpoint (e.g. `/apis-docs#cart-add-item`).
+
+8. *** (404 Fallback):**
    - Clean 404 error page with action button linking back to `/products`.
 
 ---
@@ -161,9 +167,24 @@ Every interactive element includes stable, deterministic `data-testid` identifie
 | Orders Link | `nav-orders` | Navlink to `/orders` |
 | Profile Link | `nav-profile` | Navlink to `/profile` |
 | Manage Products Link | `nav-admin-products` | Navlink to `/admin/products` (admins only) |
+| APIs Link | `nav-apis` | External link to the backend Swagger UI |
+| APIs Docs Link | `nav-apis-docs` | Navlink to `/apis-docs` (written reference) |
 | Logout Button | `nav-logout` | Header logout button |
 | Success Toast | `toast-success` | Success notification bubble |
 | Error Toast | `toast-error` | Error notification bubble |
+
+### APIs Docs Page Elements
+| Element | `data-testid` | Description |
+|---|---|---|
+| Page Root | `api-docs-page` | APIs Docs page container |
+| Filter Input | `api-docs-search` | Filters the endpoint list by method, path or group |
+| Expand All | `api-docs-expand-all` | Opens every endpoint card |
+| Collapse All | `api-docs-collapse-all` | Closes every endpoint card |
+| Sidebar | `api-docs-sidebar` | Sticky endpoint navigation |
+| Sidebar Link | `api-docs-nav-${endpointId}` | Jumps to and opens one endpoint |
+| Endpoint Card | `endpoint-${endpointId}` | One endpoint's documentation block |
+| Endpoint Toggle | `endpoint-toggle-${endpointId}` | Expands/collapses that card |
+| Endpoint Errors | `endpoint-errors-${endpointId}` | That endpoint's error-code table |
 
 ### Product Page Elements
 | Element | `data-testid` | Description |
