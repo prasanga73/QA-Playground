@@ -26,7 +26,7 @@ router.get('/', authenticate, (req, res) => {
   const cart = getOrCreateCart(db, req.user.id);
 
   const items = db.prepare(`
-    SELECT ci.id, ci.product_id, ci.quantity, ci.created_at,
+    SELECT ci.product_id, ci.quantity, ci.created_at,
            p.name, p.price, p.stock, p.category, p.image_url
     FROM cart_items ci
     JOIN products p ON ci.product_id = p.id
@@ -38,9 +38,7 @@ router.get('/', authenticate, (req, res) => {
 
   return successResponse(res, {
     cart: {
-      id: cart.id,
       items: items.map(item => ({
-        id: item.id,
         productId: item.product_id,
         name: item.name,
         price: item.price,
@@ -99,7 +97,6 @@ router.post('/items', authenticate, (req, res) => {
     return successResponse(res, {
       message: 'Cart item quantity updated',
       item: {
-        id: existingItem.id,
         productId: product.id,
         name: product.name,
         price: product.price,
@@ -110,12 +107,11 @@ router.post('/items', authenticate, (req, res) => {
     });
   }
 
-  const result = db.prepare('INSERT INTO cart_items (cart_id, product_id, quantity) VALUES (?, ?, ?)').run(cart.id, productId, qty);
+  db.prepare('INSERT INTO cart_items (cart_id, product_id, quantity) VALUES (?, ?, ?)').run(cart.id, productId, qty);
 
   return successResponse(res, {
     message: 'Item added to cart',
     item: {
-      id: result.lastInsertRowid,
       productId: product.id,
       name: product.name,
       price: product.price,
@@ -127,7 +123,10 @@ router.post('/items', authenticate, (req, res) => {
 });
 
 /**
- * PUT and PATCH /api/cart/items/:itemId (update item quantity)
+ * PUT and PATCH /api/cart/items/:productId (update item quantity)
+ *
+ * A cart holds at most one line per product (UNIQUE(cart_id, product_id)),
+ * so the product id addresses the line; there is no separate cart-item id.
  */
 function updateCartItem(req, res) {
   const { quantity } = req.body;
@@ -147,8 +146,8 @@ function updateCartItem(req, res) {
     SELECT ci.*, p.name, p.price, p.stock, p.image_url
     FROM cart_items ci
     JOIN products p ON ci.product_id = p.id
-    WHERE ci.id = ? AND ci.cart_id = ?
-  `).get(req.params.itemId, cart.id);
+    WHERE ci.product_id = ? AND ci.cart_id = ?
+  `).get(req.params.productId, cart.id);
 
   if (!item) {
     return errorResponse(res, 404, 'Cart item not found', 'NOT_FOUND');
@@ -159,7 +158,7 @@ function updateCartItem(req, res) {
     return successResponse(res, {
       message: 'Item removed from cart',
       deleted: true,
-      itemId: item.id,
+      productId: item.product_id,
     });
   }
 
@@ -172,7 +171,6 @@ function updateCartItem(req, res) {
   return successResponse(res, {
     message: 'Cart item quantity updated',
     item: {
-      id: item.id,
       productId: item.product_id,
       name: item.name,
       price: item.price,
@@ -183,13 +181,13 @@ function updateCartItem(req, res) {
   });
 }
 
-router.put('/items/:itemId', authenticate, updateCartItem);
-router.patch('/items/:itemId', authenticate, updateCartItem);
+router.put('/items/:productId', authenticate, updateCartItem);
+router.patch('/items/:productId', authenticate, updateCartItem);
 
 /**
- * DELETE /api/cart/items/:itemId (remove item from cart)
+ * DELETE /api/cart/items/:productId (remove item from cart)
  */
-router.delete('/items/:itemId', authenticate, (req, res) => {
+router.delete('/items/:productId', authenticate, (req, res) => {
   const db = getDb();
   const cart = db.prepare('SELECT * FROM carts WHERE user_id = ?').get(req.user.id);
 
@@ -197,13 +195,13 @@ router.delete('/items/:itemId', authenticate, (req, res) => {
     return errorResponse(res, 404, 'Cart not found', 'NOT_FOUND');
   }
 
-  const item = db.prepare('SELECT * FROM cart_items WHERE id = ? AND cart_id = ?').get(req.params.itemId, cart.id);
+  const item = db.prepare('SELECT * FROM cart_items WHERE product_id = ? AND cart_id = ?').get(req.params.productId, cart.id);
 
   if (!item) {
     return errorResponse(res, 404, 'Cart item not found', 'NOT_FOUND');
   }
 
-  db.prepare('DELETE FROM cart_items WHERE id = ?').run(req.params.itemId);
+  db.prepare('DELETE FROM cart_items WHERE id = ?').run(item.id);
 
   return successResponse(res, { message: 'Item removed from cart' });
 });

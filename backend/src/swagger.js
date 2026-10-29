@@ -47,8 +47,7 @@ const openapiSpecification = {
       CartItem: {
         type: 'object',
         properties: {
-          id: { type: 'integer', example: 1 },
-          productId: { type: 'integer', example: 1 },
+          productId: { type: 'integer', example: 1, description: 'Identifies the cart line: a cart holds at most one line per product.' },
           name: { type: 'string', example: 'Wireless Bluetooth Headphones' },
           price: { type: 'number', example: 79.99 },
           quantity: { type: 'integer', example: 2 },
@@ -708,13 +707,13 @@ const openapiSpecification = {
         },
       },
     },
-    '/api/cart/items/{itemId}': {
+    '/api/cart/items/{productId}': {
       put: {
         summary: 'Update cart item quantity',
         security: [{ bearerAuth: [] }],
         tags: ['Cart'],
         parameters: [
-          { name: 'itemId', in: 'path', required: true, schema: { type: 'integer' } },
+          { name: 'productId', in: 'path', required: true, schema: { type: 'integer' }, description: 'Product id of the cart line.' },
         ],
         requestBody: {
           required: true,
@@ -738,7 +737,7 @@ const openapiSpecification = {
           200: { description: 'Quantity updated, or item removed when quantity <= 0' },
           400: { description: 'Insufficient stock' },
           401: { description: 'Unauthorized' },
-          404: { description: 'Cart or cart item not found' },
+          404: { description: 'Cart not found, or the product is not in the cart' },
           422: { description: 'Quantity must be an integer' },
         },
       },
@@ -748,7 +747,7 @@ const openapiSpecification = {
         security: [{ bearerAuth: [] }],
         tags: ['Cart'],
         parameters: [
-          { name: 'itemId', in: 'path', required: true, schema: { type: 'integer' } },
+          { name: 'productId', in: 'path', required: true, schema: { type: 'integer' }, description: 'Product id of the cart line.' },
         ],
         requestBody: {
           required: true,
@@ -772,7 +771,7 @@ const openapiSpecification = {
           200: { description: 'Quantity updated, or item removed when quantity <= 0' },
           400: { description: 'Insufficient stock' },
           401: { description: 'Unauthorized' },
-          404: { description: 'Cart or cart item not found' },
+          404: { description: 'Cart not found, or the product is not in the cart' },
           422: { description: 'Quantity must be an integer' },
         },
       },
@@ -781,12 +780,12 @@ const openapiSpecification = {
         security: [{ bearerAuth: [] }],
         tags: ['Cart'],
         parameters: [
-          { name: 'itemId', in: 'path', required: true, schema: { type: 'integer' } },
+          { name: 'productId', in: 'path', required: true, schema: { type: 'integer' }, description: 'Product id of the cart line.' },
         ],
         responses: {
           200: { description: 'Item removed' },
           401: { description: 'Unauthorized' },
-          404: { description: 'Item not found' },
+          404: { description: 'Cart not found, or the product is not in the cart' },
         },
       },
     },

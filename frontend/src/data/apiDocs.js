@@ -54,8 +54,7 @@ const PAGINATION_FIELDS = (def) => [
 ];
 
 const CART_ITEM_FIELDS = (p) => [
-  { name: `${p}.id`, type: 'integer', desc: 'Cart-item id — the :itemId for update/delete.' },
-  { name: `${p}.productId`, type: 'integer', desc: 'Product on this line.' },
+  { name: `${p}.productId`, type: 'integer', desc: 'Product on this line, and the :productId used by update/delete.' },
   { name: `${p}.name`, type: 'string', desc: 'Product name.' },
   { name: `${p}.price`, type: 'number', desc: 'Current unit price.' },
   { name: `${p}.quantity`, type: 'integer', desc: 'Units on the line.' },
@@ -672,10 +671,8 @@ export const API_GROUPS = [
             example: `{
   "success": true,
   "cart": {
-    "id": 3,
     "items": [
       {
-        "id": 12,
         "productId": 1,
         "name": "Wireless Bluetooth Headphones",
         "price": 249.99,
@@ -691,7 +688,6 @@ export const API_GROUPS = [
   }
 }`,
             fields: [
-              { name: 'cart.id', type: 'integer', desc: 'Cart id.' },
               { name: 'cart.items', type: 'object[]', desc: 'One entry per distinct product.' },
               ...CART_ITEM_FIELDS('cart.items[]'),
               { name: 'cart.items[].stock', type: 'integer', desc: 'Current stock of the product.' },
@@ -723,7 +719,6 @@ export const API_GROUPS = [
   "success": true,
   "message": "Item added to cart",
   "item": {
-    "id": 12,
     "productId": 1,
     "name": "Wireless Bluetooth Headphones",
     "price": 249.99,
@@ -744,7 +739,6 @@ export const API_GROUPS = [
   "success": true,
   "message": "Cart item quantity updated",
   "item": {
-    "id": 12,
     "productId": 1,
     "name": "Wireless Bluetooth Headphones",
     "price": 249.99,
@@ -766,12 +760,12 @@ export const API_GROUPS = [
         id: 'cart-update-item',
         method: 'PUT',
         altMethods: ['PATCH'],
-        path: '/api/cart/items/:itemId',
+        path: '/api/cart/items/:productId',
         title: 'Set cart item quantity',
         summary: 'Sets an absolute quantity. PUT and PATCH behave identically.',
         auth: 'user',
-        note: ':itemId is the cart-item id, not the product id. A quantity of 0 or less removes the line.',
-        params: [{ name: 'itemId', in: 'path', type: 'integer', req: true, desc: 'Cart-item id from cart.items[].id.' }],
+        note: 'A cart holds at most one line per product, so the line is addressed by product id. A quantity of 0 or less removes it.',
+        params: [{ name: 'productId', in: 'path', type: 'integer', req: true, desc: 'Product id of the line to update.' }],
         body: [{ name: 'quantity', type: 'integer', req: true, desc: 'New absolute quantity; must fit in stock.' }],
         responses: [
           {
@@ -780,7 +774,6 @@ export const API_GROUPS = [
   "success": true,
   "message": "Cart item quantity updated",
   "item": {
-    "id": 12,
     "productId": 1,
     "name": "Wireless Bluetooth Headphones",
     "price": 249.99,
@@ -797,29 +790,29 @@ export const API_GROUPS = [
   "success": true,
   "message": "Item removed from cart",
   "deleted": true,
-  "itemId": 12
+  "productId": 1
 }`,
             fields: [
               { name: 'message', type: 'string', desc: '"Item removed from cart" (quantity was ≤ 0).' },
               { name: 'deleted', type: 'boolean', desc: 'true — tells the two 200s apart.' },
-              { name: 'itemId', type: 'integer', desc: 'The removed cart-item id.' },
+              { name: 'productId', type: 'integer', desc: 'Product whose line was removed.' },
             ],
           },
         ],
         errors: [
           { status: 422, code: 'VALIDATION_ERROR', when: 'quantity missing or not a number.' },
-          { status: 404, code: 'NOT_FOUND', when: 'No cart, or line not in the caller\'s cart.' },
+          { status: 404, code: 'NOT_FOUND', when: 'No cart, or the product is not in the caller\'s cart.' },
           { status: 400, code: 'INSUFFICIENT_STOCK', when: 'Quantity exceeds stock.' },
         ],
       },
       {
         id: 'cart-delete-item',
         method: 'DELETE',
-        path: '/api/cart/items/:itemId',
+        path: '/api/cart/items/:productId',
         title: 'Remove cart item',
         summary: 'Deletes one line. Returns a 200 envelope, not 204.',
         auth: 'user',
-        params: [{ name: 'itemId', in: 'path', type: 'integer', req: true, desc: 'Cart-item id to remove.' }],
+        params: [{ name: 'productId', in: 'path', type: 'integer', req: true, desc: 'Product id of the line to remove.' }],
         body: [],
         responses: [{
             status: 200,
@@ -828,7 +821,7 @@ export const API_GROUPS = [
   "message": "Item removed from cart"
 }`,
             fields: [{ name: 'message', type: 'string', desc: '"Item removed from cart".' }] }],
-        errors: [{ status: 404, code: 'NOT_FOUND', when: 'No cart, or line not in the caller\'s cart.' }],
+        errors: [{ status: 404, code: 'NOT_FOUND', when: 'No cart, or the product is not in the caller\'s cart.' }],
       },
       {
         id: 'cart-clear',

@@ -61,9 +61,10 @@ export const CartPage = () => {
   }, [fetchCart]);
 
   // Handle quantity increment/decrement with completely smooth instant optimistic UI update
-  const handleUpdateQuantity = (itemId, targetQty, itemName, stock) => {
+  // Cart lines are addressed by product id: a cart holds at most one line per product.
+  const handleUpdateQuantity = (productId, targetQty, itemName, stock) => {
     if (targetQty <= 0) {
-      handleRemoveItem(itemId, itemName);
+      handleRemoveItem(productId, itemName);
       return;
     }
 
@@ -76,7 +77,7 @@ export const CartPage = () => {
     setCart((prevCart) => {
       if (!prevCart) return prevCart;
       const updatedItems = (prevCart.items || []).map((item) => {
-        if (item.id === itemId) {
+        if (item.productId === productId) {
           const lineTotal = Math.round(item.price * targetQty * 100) / 100;
           return { ...item, quantity: targetQty, lineTotal };
         }
@@ -86,14 +87,14 @@ export const CartPage = () => {
     });
 
     // Debounce the backend sync by 250ms so rapid clicks (+ + +) are butter smooth
-    if (updateTimersRef.current[itemId]) {
-      clearTimeout(updateTimersRef.current[itemId]);
+    if (updateTimersRef.current[productId]) {
+      clearTimeout(updateTimersRef.current[productId]);
     }
 
-    updateTimersRef.current[itemId] = setTimeout(async () => {
-      delete updateTimersRef.current[itemId];
+    updateTimersRef.current[productId] = setTimeout(async () => {
+      delete updateTimersRef.current[productId];
       try {
-        const response = await api.put(`/cart/items/${itemId}`, { quantity: targetQty });
+        const response = await api.put(`/cart/items/${productId}`, { quantity: targetQty });
         if (!response.data.success) {
           showError(response.data.message || 'Failed to update quantity');
           fetchCart();
@@ -106,21 +107,21 @@ export const CartPage = () => {
   };
 
   // Handle removing a line item with instant optimistic UI update
-  const handleRemoveItem = async (itemId, itemName) => {
+  const handleRemoveItem = async (productId, itemName) => {
     // Clear any pending debounce update for this item
-    if (updateTimersRef.current[itemId]) {
-      clearTimeout(updateTimersRef.current[itemId]);
-      delete updateTimersRef.current[itemId];
+    if (updateTimersRef.current[productId]) {
+      clearTimeout(updateTimersRef.current[productId]);
+      delete updateTimersRef.current[productId];
     }
 
     // Optimistically remove item from UI immediately
     setCart((prevCart) => {
       if (!prevCart) return prevCart;
-      return withItems(prevCart, (prevCart.items || []).filter((item) => item.id !== itemId));
+      return withItems(prevCart, (prevCart.items || []).filter((item) => item.productId !== productId));
     });
 
     try {
-      const response = await api.delete(`/cart/items/${itemId}`);
+      const response = await api.delete(`/cart/items/${productId}`);
       if (response.data.success) {
         showSuccess(`Removed "${itemName}" from cart`);
       } else {
@@ -138,7 +139,7 @@ export const CartPage = () => {
     const promises = Object.entries(updateTimersRef.current).map(([id, timer]) => {
       clearTimeout(timer);
       delete updateTimersRef.current[id];
-      const item = cart?.items?.find((i) => String(i.id) === String(id));
+      const item = cart?.items?.find((i) => String(i.productId) === String(id));
       if (item) {
         return api.put(`/cart/items/${id}`, { quantity: item.quantity }).catch(() => {});
       }
@@ -234,17 +235,17 @@ export const CartPage = () => {
                     const isAtMaxStock = item.stock && item.quantity >= item.stock;
 
                     return (
-                      <tr key={item.id} data-testid={`cart-item-${item.id}`}>
+                      <tr key={item.productId} data-testid={`cart-item-${item.productId}`}>
                         <td className="cart-product-cell">
                           <div className="cart-product-media">
                             <ProductImage
                               src={item.imageUrl || '/images/placeholder.svg'}
                               alt={item.name}
-                              testId={`cart-item-image-${item.id}`}
+                              testId={`cart-item-image-${item.productId}`}
                               className="cart-thumbnail"
                             />
                             <div className="cart-item-info">
-                              <span className="cart-item-name" data-testid={`cart-item-name-${item.id}`}>
+                              <span className="cart-item-name" data-testid={`cart-item-name-${item.productId}`}>
                                 {item.name}
                               </span>
                               <span className="cart-item-category">{item.category}</span>
@@ -256,16 +257,16 @@ export const CartPage = () => {
                             </div>
                           </div>
                         </td>
-                        <td data-label="Price" data-testid={`cart-item-price-${item.id}`}>
+                        <td data-label="Price" data-testid={`cart-item-price-${item.productId}`}>
                           ${Number(item.price).toFixed(2)}
                         </td>
                         <td className="text-center" data-label="Quantity">
-                          <div className="cart-qty-stepper" data-testid={`cart-qty-stepper-${item.id}`}>
+                          <div className="cart-qty-stepper" data-testid={`cart-qty-stepper-${item.productId}`}>
                             <button
                               type="button"
                               className="cart-qty-btn cart-qty-minus"
-                              onClick={() => handleUpdateQuantity(item.id, item.quantity - 1, item.name, item.stock)}
-                              data-testid={`cart-qty-minus-${item.id}`}
+                              onClick={() => handleUpdateQuantity(item.productId, item.quantity - 1, item.name, item.stock)}
+                              data-testid={`cart-qty-minus-${item.productId}`}
                               aria-label="Decrease quantity"
                               title={item.quantity === 1 ? 'Remove item' : 'Decrease quantity'}
                             >
@@ -274,16 +275,16 @@ export const CartPage = () => {
                               </svg>
                             </button>
 
-                            <span className="cart-qty-badge" data-testid={`cart-item-qty-${item.id}`} aria-live="polite">
+                            <span className="cart-qty-badge" data-testid={`cart-item-qty-${item.productId}`} aria-live="polite">
                               {item.quantity}
                             </span>
 
                             <button
                               type="button"
                               className="cart-qty-btn cart-qty-plus"
-                              onClick={() => handleUpdateQuantity(item.id, item.quantity + 1, item.name, item.stock)}
+                              onClick={() => handleUpdateQuantity(item.productId, item.quantity + 1, item.name, item.stock)}
                               disabled={isAtMaxStock}
-                              data-testid={`cart-qty-plus-${item.id}`}
+                              data-testid={`cart-qty-plus-${item.productId}`}
                               aria-label="Increase quantity"
                               title={isAtMaxStock ? `Max warehouse stock reached (${item.stock})` : 'Increase quantity'}
                             >
@@ -294,15 +295,15 @@ export const CartPage = () => {
                             </button>
                           </div>
                         </td>
-                        <td className="font-semibold" data-label="Total" data-testid={`cart-item-total-${item.id}`}>
+                        <td className="font-semibold" data-label="Total" data-testid={`cart-item-total-${item.productId}`}>
                           ${Number(item.lineTotal).toFixed(2)}
                         </td>
                         <td className="text-center cart-action-cell">
                           <button
                             type="button"
-                            onClick={() => handleRemoveItem(item.id, item.name)}
+                            onClick={() => handleRemoveItem(item.productId, item.name)}
                             className="btn btn-outline-danger btn-sm"
-                            data-testid={`cart-remove-btn-${item.id}`}
+                            data-testid={`cart-remove-btn-${item.productId}`}
                           >
                             Remove
                           </button>

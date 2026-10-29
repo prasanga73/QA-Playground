@@ -627,7 +627,7 @@
                   "    var json = pm.response.json();",
                   "    pm.expect(json.success).to.be.true;",
                   "    pm.expect(json.item).to.have.property('productId');",
-                  "    pm.environment.set('testCartItemId', json.item.id);",
+                  "    pm.environment.set('testCartProductId', json.item.productId);",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -641,9 +641,9 @@
             "method": "DELETE",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/cart/items/{{testCartItemId}}",
+              "raw": "{{baseUrl}}/api/cart/items/{{testCartProductId}}",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "cart", "items", "{{testCartItemId}}"]
+              "path": ["api", "cart", "items", "{{testCartProductId}}"]
             }
           },
           "event": [

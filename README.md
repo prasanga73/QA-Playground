@@ -98,7 +98,8 @@ The frontend contains **5 shopper pages**, **1 admin-only page**, plus a 404 fal
    - Instant success/error toast notifications and empty state handling.
 
 3. **/cart (Protected):**
-   - Active cart items table displaying product thumbnail image (`data-testid="cart-item-image-${id}"`), title, unit price, quantity, line total, and "Remove" button.
+   - Active cart items table displaying product thumbnail image (`data-testid="cart-item-image-${productId}"`), title, unit price, quantity, line total, and "Remove" button.
+   - Cart lines are addressed by **product id** — a cart holds at most one line per product, so `PUT|PATCH|DELETE /api/cart/items/:productId` and every `cart-*` `data-testid` suffix use the product id.
    - Live order summary card with item count, subtotal, and total.
    - "Place Order" button that submits order and redirects to `/orders`.
    - Empty cart state with "Browse Products" action button.
@@ -209,9 +210,9 @@ Every interactive element includes stable, deterministic `data-testid` identifie
 | Element | `data-testid` | Description |
 |---|---|---|
 | Cart Table | `cart-table` | Shopping cart table |
-| Cart Row | `cart-item-{id}` | Table row for cart item |
-| Cart Item Image | `cart-item-image-{id}` | Product image thumbnail in cart row |
-| Remove Item Button | `cart-remove-btn-{id}` | Remove item from cart button |
+| Cart Row | `cart-item-{productId}` | Table row for cart item |
+| Cart Item Image | `cart-item-image-{productId}` | Product image thumbnail in cart row |
+| Remove Item Button | `cart-remove-btn-{productId}` | Remove item from cart button |
 | Cart Subtotal | `cart-subtotal` | Summary subtotal amount |
 | Cart Total | `cart-total` | Summary total amount |
 | Place Order Button | `place-order-btn` | Order checkout button |

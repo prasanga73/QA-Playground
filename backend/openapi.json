@@ -89,13 +89,10 @@
       "CartItem": {
         "type": "object",
         "properties": {
-          "id": {
-            "type": "integer",
-            "example": 1
-          },
           "productId": {
             "type": "integer",
-            "example": 1
+            "example": 1,
+            "description": "Identifies the cart line: a cart holds at most one line per product."
           },
           "name": {
             "type": "string",
@@ -1339,7 +1336,7 @@
         }
       }
     },
-    "/api/cart/items/{itemId}": {
+    "/api/cart/items/{productId}": {
       "put": {
         "summary": "Update cart item quantity",
         "security": [
@@ -1352,12 +1349,13 @@
         ],
         "parameters": [
           {
-            "name": "itemId",
+            "name": "productId",
             "in": "path",
             "required": true,
             "schema": {
               "type": "integer"
-            }
+            },
+            "description": "Product id of the cart line."
           }
         ],
         "requestBody": {
@@ -1391,7 +1389,7 @@
             "description": "Unauthorized"
           },
           "404": {
-            "description": "Cart or cart item not found"
+            "description": "Cart not found, or the product is not in the cart"
           },
           "422": {
             "description": "Quantity must be an integer"
@@ -1411,12 +1409,13 @@
         ],
         "parameters": [
           {
-            "name": "itemId",
+            "name": "productId",
             "in": "path",
             "required": true,
             "schema": {
               "type": "integer"
-            }
+            },
+            "description": "Product id of the cart line."
           }
         ],
         "requestBody": {
@@ -1450,7 +1449,7 @@
             "description": "Unauthorized"
           },
           "404": {
-            "description": "Cart or cart item not found"
+            "description": "Cart not found, or the product is not in the cart"
           },
           "422": {
             "description": "Quantity must be an integer"
@@ -1469,12 +1468,13 @@
         ],
         "parameters": [
           {
-            "name": "itemId",
+            "name": "productId",
             "in": "path",
             "required": true,
             "schema": {
               "type": "integer"
-            }
+            },
+            "description": "Product id of the cart line."
           }
         ],
         "responses": {
@@ -1485,7 +1485,7 @@
             "description": "Unauthorized"
           },
           "404": {
-            "description": "Item not found"
+            "description": "Cart not found, or the product is not in the cart"
           }
         }
       }
